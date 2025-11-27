@@ -6,10 +6,11 @@ from fastapi import UploadFile
 from pypdf import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from app.models import (
-    NodeCreate, NodeResponse, NodeUpdate, NodeUpdateResponse, NodeDeleteResponse,
-    EdgeCreate, EdgeResponse, EdgeDeleteResponse,
-    VectorSearchResult, GraphTraversalResponse, GraphTraversalResultItem,
-    HybridSearchResult
+    NodeCreate, NodeResponse, NodeCreateResponse, NodeUpdate, NodeUpdateResponse, NodeDeleteResponse,
+    EdgeCreate, EdgeResponse, EdgeCreateResponse, EdgeGetResponse, EdgeUpdate, EdgeUpdateResponse, EdgeDeleteResponse,
+    VectorSearchResultItem, VectorSearchResponse,
+    GraphTraversalResponse, GraphTraversalNode,
+    HybridSearchResultItem, HybridSearchResponse
 )
 from app.vector_db import VectorDatabase
 from graph_db.graph_db import GraphDatabase
@@ -30,35 +31,39 @@ class HybridRetrievalService:
 
     # ==================== Node Operations ====================
 
-    def create_node(self, node_data: NodeCreate) -> NodeResponse:
+    def create_node(self, node_data: NodeCreate) -> NodeCreateResponse:
         # Create in GraphDB
-        # Note: GraphDatabase.create_node returns a GraphNode
-        # We don't generate embedding here manually if we use VectorDB to handle it via sentence-transformers
-        # But GraphNode has an 'embedding' field. 
-        # The prompt says "auto_embed: true" -> "embedding_created: true"
-        # It implies the system handles it.
-        # My VectorDB wrapper uses HuggingFaceEmbeddings to embed text.
-        # So I should add to VectorDB if auto_embed is True.
-        
-        # Create node in graph first to get ID
         graph_node = self.graph_db.create_node(
+            node_id=node_data.id,
             text=node_data.text,
-            metadata=node_data.metadata
+            metadata=node_data.metadata,
+            embedding=node_data.embedding
         )
         
-        embedding_created = False
-        if node_data.auto_embed:
+        embedding_dim = None
+        if node_data.regen_embedding:
+            # Add to VectorDB (which generates embedding)
+            # We assume model dim is 384 for all-MiniLM-L6-v2
+            embedding_dim = 384
+            
             # Add 'id' to metadata for VectorDB retrieval
             meta = node_data.metadata.copy()
-            meta['id'] = graph_node.id
-            self.vector_db.add_document(graph_node.id, node_data.text, meta)
-            embedding_created = True
+            meta['id'] = node_data.id
             
-        return NodeResponse(
-            id=graph_node.id,
-            text=graph_node.text,
-            metadata=graph_node.metadata,
-            embedding_created=embedding_created
+            # Sanitize metadata for Chroma (no lists allowed)
+            chroma_meta = {}
+            for k, v in meta.items():
+                if isinstance(v, list):
+                    chroma_meta[k] = ", ".join(map(str, v))
+                else:
+                    chroma_meta[k] = v
+            
+            self.vector_db.add_document(node_data.id, node_data.text, chroma_meta)
+            
+        return NodeCreateResponse(
+            status="created",
+            id=node_data.id,
+            embedding_dim=embedding_dim
         )
 
     def get_node(self, node_id: str) -> Optional[NodeResponse]:
@@ -66,18 +71,26 @@ class HybridRetrievalService:
         if not graph_node:
             return None
             
-        # Get relationships
-        relationships = []
-        # GraphDatabase doesn't have a direct "get_edges_for_node" method exposed clearly in the interface 
-        # but we can access the graph directly or implement a helper.
-        # The prompt response for Get Node includes "relationships": [{target, type, weight}]
-        # I'll access the networkx graph directly from graph_db.graph
+        # Get embedding from VectorDB if possible, or GraphDB
+        embedding = graph_node.embedding
+        if not embedding:
+            try:
+                result = self.vector_db.db.get(ids=[node_id], include=['embeddings'])
+                # Check if embeddings are present and not empty
+                if result and 'embeddings' in result and result['embeddings'] is not None and len(result['embeddings']) > 0:
+                    embedding = result['embeddings'][0]
+            except Exception as e:
+                # print(f"Error fetching embedding: {e}")
+                pass
         
-        # Outgoing edges
+        # Get edges
+        edges = []
         if node_id in self.graph_db.graph:
+            # Outgoing edges
             for neighbor in self.graph_db.graph.successors(node_id):
                 for key, edge_data in self.graph_db.graph[node_id][neighbor].items():
-                    relationships.append({
+                    edges.append({
+                        "edge_id": edge_data.get("id"),
                         "target": neighbor,
                         "type": edge_data.get("type"),
                         "weight": edge_data.get("weight")
@@ -87,7 +100,8 @@ class HybridRetrievalService:
             id=graph_node.id,
             text=graph_node.text,
             metadata=graph_node.metadata,
-            relationships=relationships
+            embedding=embedding,
+            edges=edges
         )
 
     def update_node(self, node_id: str, update_data: NodeUpdate) -> Optional[NodeUpdateResponse]:
@@ -103,13 +117,22 @@ class HybridRetrievalService:
         )
         
         embedding_regenerated = False
-        if update_data.regenerate_embedding:
-            # We need the text. If it was updated, use new text. If not, fetch existing.
+        if update_data.regen_embedding:
+            # Get current text (updated or existing)
             current_node = self.graph_db.get_node(node_id)
             if current_node:
                 meta = current_node.metadata.copy()
                 meta['id'] = node_id
-                self.vector_db.update_document(node_id, current_node.text, meta)
+                
+                # Sanitize metadata for Chroma
+                chroma_meta = {}
+                for k, v in meta.items():
+                    if isinstance(v, list):
+                        chroma_meta[k] = ", ".join(map(str, v))
+                    else:
+                        chroma_meta[k] = v
+                        
+                self.vector_db.update_document(node_id, current_node.text, chroma_meta)
                 embedding_regenerated = True
                 
         return NodeUpdateResponse(
@@ -119,11 +142,11 @@ class HybridRetrievalService:
         )
 
     def delete_node(self, node_id: str) -> Optional[NodeDeleteResponse]:
-        # Count edges to be removed for response
-        edges_removed = 0
+        # Count edges to be removed
+        removed_edges_count = 0
         if node_id in self.graph_db.graph:
-            edges_removed += self.graph_db.graph.out_degree(node_id)
-            edges_removed += self.graph_db.graph.in_degree(node_id)
+            removed_edges_count += self.graph_db.graph.out_degree(node_id)
+            removed_edges_count += self.graph_db.graph.in_degree(node_id)
             
         success = self.graph_db.delete_node(node_id)
         if not success:
@@ -135,12 +158,12 @@ class HybridRetrievalService:
         return NodeDeleteResponse(
             status="deleted",
             id=node_id,
-            edges_removed=edges_removed
+            removed_edges_count=removed_edges_count
         )
 
     # ==================== Edge Operations ====================
 
-    def create_edge(self, edge_data: EdgeCreate) -> Optional[EdgeResponse]:
+    def create_edge(self, edge_data: EdgeCreate) -> Optional[EdgeCreateResponse]:
         edge = self.graph_db.create_edge(
             source_id=edge_data.source,
             target_id=edge_data.target,
@@ -150,8 +173,19 @@ class HybridRetrievalService:
         if not edge:
             return None
             
-        return EdgeResponse(
-            status="edge_created",
+        return EdgeCreateResponse(
+            status="created",
+            edge_id=edge.id,
+            source=edge.source,
+            target=edge.target
+        )
+
+    def get_edge(self, edge_id: str) -> Optional[EdgeGetResponse]:
+        edge = self.graph_db.get_edge(edge_id)
+        if not edge:
+            return None
+            
+        return EdgeGetResponse(
             edge_id=edge.id,
             source=edge.source,
             target=edge.target,
@@ -159,17 +193,20 @@ class HybridRetrievalService:
             weight=edge.weight
         )
 
-    def get_edge(self, edge_id: str) -> Optional[EdgeResponse]:
-        edge = self.graph_db.get_edge(edge_id)
-        if not edge:
+    def update_edge(self, edge_id: str, update_data: EdgeUpdate) -> Optional[EdgeUpdateResponse]:
+        if edge_id not in self.graph_db._edge_id_map:
             return None
             
-        return EdgeResponse(
-            edge_id=edge.id,
-            source=edge.source,
-            target=edge.target,
-            type=edge.type,
-            weight=edge.weight
+        source, target, key = self.graph_db._edge_id_map[edge_id]
+        self.graph_db.graph[source][target][key]['weight'] = update_data.weight
+        
+        if self.graph_db.auto_persist:
+            self.graph_db.save()
+            
+        return EdgeUpdateResponse(
+            status="updated",
+            edge_id=edge_id,
+            new_weight=update_data.weight
         )
 
     def delete_edge(self, edge_id: str) -> Optional[EdgeDeleteResponse]:
@@ -179,305 +216,237 @@ class HybridRetrievalService:
             
         return EdgeDeleteResponse(
             status="deleted",
-            id=edge_id
+            edge_id=edge_id
         )
 
     # ==================== Search Operations ====================
 
-    def vector_search(self, query: str, top_k: int, filter: Optional[Dict[str, Any]] = None) -> List[VectorSearchResult]:
+    def vector_search(self, query: str, top_k: int, filter: Optional[Dict[str, Any]] = None) -> VectorSearchResponse:
         results = self.vector_db.search(query, top_k, filter=filter)
-        response = []
+        items = []
         for doc_id, text, score, metadata in results:
-            # Ensure doc_id is present (fallback to metadata if needed)
             nid = doc_id or metadata.get('id')
             if not nid:
-                continue # Skip if no ID found
+                continue
                 
-            response.append(VectorSearchResult(
-                node_id=nid,
-                text=text,
-                cosine_similarity=round(score, 4),
-                metadata=metadata
+            items.append(VectorSearchResultItem(
+                id=nid,
+                vector_score=round(score, 4)
             ))
-        return response
+            
+        return VectorSearchResponse(
+            query_text=query,
+            results=items
+        )
 
-    def graph_traversal(self, start_id: str, depth: int) -> Optional[GraphTraversalResponse]:
+    def graph_traversal(self, start_id: str, depth: int, type_filter: Optional[str] = None) -> Optional[GraphTraversalResponse]:
         if not self.graph_db.get_node(start_id):
             return None
             
-        # Use GraphDB traverse, but we need depths. 
-        # GraphDB.traverse returns list of IDs.
-        # GraphDB.compute_graph_scores calculates scores but logic is slightly different.
-        # I'll implement a simple BFS here to get depths as requested in API.
+        # BFS with path tracking
+        visited = {start_id}
+        queue = collections.deque([(start_id, 0, [], [])]) # node_id, depth, edge_types, edge_weights
         
-        visited = {start_id: 0}
-        queue = [(start_id, 0)]
-        results = []
-        
-        import collections
-        queue = collections.deque([(start_id, 0)])
+        nodes = []
         
         while queue:
-            node_id, current_depth = queue.popleft()
+            curr_id, curr_depth, path_types, path_weights = queue.popleft()
             
-            if current_depth > 0:
-                results.append(GraphTraversalResultItem(node_id=node_id, depth=current_depth))
+            if curr_depth > 0:
+                node_info = {
+                    "id": curr_id,
+                    "hop": curr_depth
+                }
+                
+                if curr_depth == 1:
+                    node_info["edge"] = path_types[0]
+                    node_info["weight"] = path_weights[0]
+                else:
+                    node_info["edge_path"] = path_types
+                    node_info["weights"] = path_weights
+                    
+                nodes.append(GraphTraversalNode(**node_info))
             
-            if current_depth < depth:
-                # Neighbors
-                if node_id in self.graph_db.graph:
-                    neighbors = set(self.graph_db.graph.successors(node_id))
-                    for neighbor in neighbors:
-                        if neighbor not in visited:
-                            visited[neighbor] = current_depth + 1
-                            queue.append((neighbor, current_depth + 1))
+            if curr_depth < depth:
+                if curr_id in self.graph_db.graph:
+                    for neighbor in self.graph_db.graph.successors(curr_id):
+                        if neighbor in visited:
+                            continue
+                            
+                        # Check edges
+                        # MultiDiGraph can have multiple edges. We take the first one or iterate?
+                        # Prompt implies simple traversal.
+                        # We'll take the first edge that matches filter (if any)
+                        
+                        edge_found = False
+                        for key, edge_data in self.graph_db.graph[curr_id][neighbor].items():
+                            etype = edge_data.get("type")
+                            eweight = edge_data.get("weight")
+                            
+                            if type_filter and etype != type_filter:
+                                continue
+                                
+                            visited.add(neighbor)
+                            queue.append((
+                                neighbor, 
+                                curr_depth + 1, 
+                                path_types + [etype], 
+                                path_weights + [eweight]
+                            ))
+                            edge_found = True
+                            break # Only follow one edge to a neighbor to avoid duplicates in simple BFS
                             
         return GraphTraversalResponse(
-            start=start_id,
+            start_id=start_id,
             depth=depth,
-            results=results
+            nodes=nodes
         )
 
-    def hybrid_search(self, query: str, vector_weight: float, graph_weight: float, top_k: int, filter: Optional[Dict[str, Any]] = None) -> List[HybridSearchResult]:
+    def hybrid_search(self, query: str, vector_weight: float, graph_weight: float, top_k: int) -> HybridSearchResponse:
         # 1. Vector Search
-        vector_results = self.vector_search(query, top_k, filter=filter)
+        vector_results = self.vector_db.search(query, top_k)
         
-        # 2. Graph Expansion & Scoring - Optimized with Multi-Source BFS
-        # We need to compute graph scores for each vector result
-        # Map: node_id -> {cosine_score, graph_score, text, metadata}
         candidates = {}
-        
-        # Initialize with vector results
-        # We'll use these as starting points for Multi-Source BFS
         start_nodes = []
         
-        for res in vector_results:
-            candidates[res.node_id] = {
-                "text": res.text,
-                "metadata": res.metadata,
-                "cosine_similarity": res.cosine_similarity,
-                "graph_score": 0.0
-            }
-            start_nodes.append(res.node_id)
+        for doc_id, text, score, metadata in vector_results:
+            nid = doc_id or metadata.get('id')
+            if not nid: continue
             
-        # Multi-Source BFS
-        # We want to find the minimum depth from ANY start node to other nodes.
-        # Depth 0 (Start Node) -> Score 1.0
-        # Depth 1 -> Score 1.0
-        # Depth 2 -> Score 0.5
-        
-        graph_scores_map = {} # node_id -> score
-        visited = {} # node_id -> min_depth
-        
-        # Initialize queue with all start nodes at depth 0
+            candidates[nid] = {
+                "vector_score": score,
+                "graph_score": 0.0,
+                "info": {"hop": 0}
+            }
+            start_nodes.append(nid)
+            
+        # 2. Graph Scoring: 1 / (1 + hops)
         queue = collections.deque()
+        visited = {} 
+        
         for nid in start_nodes:
             if nid not in visited:
                 visited[nid] = 0
                 queue.append((nid, 0))
-                # Score for depth 0
-                graph_scores_map[nid] = 1.0
-        
+                
         while queue:
-            curr, d = queue.popleft()
+            curr_id, hops = queue.popleft()
             
-            # Determine score based on depth
-            score = 0.0
-            if d == 0: score = 1.0
-            elif d == 1: score = 1.0
-            elif d == 2: score = 0.5
+            g_score = 1.0 / (1.0 + hops)
             
-            # We only process up to depth 2 for scoring
-            if d > 2:
-                continue
-                
-            # Update score if better (though BFS guarantees we see min depth first, so first visit is best)
-            # But since we have multiple sources, a node might be reached from source A at depth 2 
-            # and later from source B at depth 1? 
-            # No, standard BFS with all sources in initial queue guarantees finding min depth from *any* source first.
-            # So we just assign score on first visit.
-            graph_scores_map[curr] = score
-            
-            if d < 2:
-                if curr in self.graph_db.graph:
-                    # Expand to neighbors (Successors and Predecessors)
-                    neighbors = set(self.graph_db.graph.successors(curr)) | set(self.graph_db.graph.predecessors(curr))
-                    for n in neighbors:
-                        if n not in visited:
-                            visited[n] = d + 1
-                            queue.append((n, d + 1))
-
-        # 3. Combine
-        final_candidates = {}
-        
-        # Add vector results again to ensure they are in (they might be in graph_scores_map too)
-        for nid, data in candidates.items():
-            final_candidates[nid] = data
-            
-        # Add pure graph results
-        for nid, g_score in graph_scores_map.items():
-            if nid not in final_candidates:
-                # Fetch node details
-                node = self.graph_db.get_node(nid)
-                if node:
-                    final_candidates[nid] = {
-                        "text": node.text,
-                        "metadata": node.metadata,
-                        "cosine_similarity": 0.0,
-                        "graph_score": g_score
-                    }
+            if curr_id not in candidates:
+                candidates[curr_id] = {
+                    "vector_score": 0.0,
+                    "graph_score": g_score,
+                    "info": {"hop": hops}
+                }
             else:
-                final_candidates[nid]["graph_score"] = g_score
+                candidates[curr_id]["graph_score"] = g_score
+                candidates[curr_id]["info"]["hop"] = hops
                 
-        # Calculate final score
+            if hops < 2:
+                if curr_id in self.graph_db.graph:
+                     for neighbor in self.graph_db.graph.successors(curr_id):
+                         if neighbor not in visited:
+                             visited[neighbor] = hops + 1
+                             queue.append((neighbor, hops + 1))
+
+        # 3. Final Ranking
         results = []
-        for nid, data in final_candidates.items():
-            final_score = (data["cosine_similarity"] * vector_weight) + (data["graph_score"] * graph_weight)
-            results.append(HybridSearchResult(
-                node_id=nid,
-                text=data["text"],
-                cosine_similarity=round(data["cosine_similarity"], 4),
+        for nid, data in candidates.items():
+            final = (data["vector_score"] * vector_weight) + (data["graph_score"] * graph_weight)
+            
+            results.append(HybridSearchResultItem(
+                id=nid,
+                vector_score=round(data["vector_score"], 4),
                 graph_score=round(data["graph_score"], 4),
-                final_score=round(final_score, 4),
-                metadata=data["metadata"]
+                final_score=round(final, 4),
+                info=data["info"]
             ))
             
-        # Sort by final score
         results.sort(key=lambda x: x.final_score, reverse=True)
         
-        return results[:top_k]
+        return HybridSearchResponse(
+            query_text=query,
+            vector_weight=vector_weight,
+            graph_weight=graph_weight,
+            results=results[:top_k]
+        )
 
     # ==================== PDF Operations ====================
 
-    def process_pdf_and_search(self, file: UploadFile, query: str) -> HybridSearchResult:
-        # 1. Save PDF and Extract Text
-        filename = file.filename
-        file_path = os.path.join(self.books_dir, filename)
-        
-        # Save uploaded file (PDF) - wait, user said "extract the text from it @[vector_db/books] and it should automatically store in this directory"
-        # So we should save the text file there.
-        # But first we need to read the PDF.
-        
-        # Save PDF temporarily to read it? Or read from stream.
-        # Let's read from stream to avoid saving PDF if not needed, but saving it is safer for debugging.
-        # I'll save the PDF temporarily or just process stream.
-        # User said "store in this directory and using that txt file alone".
-        # So I must save the TXT file.
-        
-        # Extract text
-        reader = PdfReader(file.file)
+    def process_pdf_and_search(self, file: UploadFile, query: str) -> Optional[Any]:
+        # 1. Save File
+        file_path = os.path.join(self.books_dir, file.filename)
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+            
+        # 2. Extract Text
+        reader = PdfReader(file_path)
         text = ""
         for page in reader.pages:
             text += page.extract_text() + "\n"
             
-        # Save text file
-        txt_filename = f"{os.path.splitext(filename)[0]}.txt"
-        txt_path = os.path.join(self.books_dir, txt_filename)
-        with open(txt_path, "w", encoding="utf-8") as f:
-            f.write(text)
-            
-        # 2. Ingest into DB (Scoped) - Optimized with Batching
-        # We need to chunk the text and create nodes.
-        # We'll use a specific source tag for this file.
-        source_id = txt_filename
-        
+        # 3. Chunk Text
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
-            chunk_overlap=100,
-            length_function=len
+            chunk_overlap=100
         )
         chunks = text_splitter.split_text(text)
         
-        # Prepare for batch insertion
-        node_ids = []
-        node_texts = []
-        node_metadatas = []
+        # 4. Create Nodes & Edges
+        prev_id = None
+        created_ids = []
         
-        # Create nodes in GraphDB first (in memory/batch if possible, but GraphDB is sequential)
-        # However, we can disable auto-persist on GraphDB temporarily if we had access, 
-        # but here we just iterate. GraphDB operations are relatively fast if not persisting every time.
-        # But VectorDB is the bottleneck.
-        
-        import uuid
-        
-        # We will create GraphNodes manually to get IDs, then batch insert to VectorDB
-        # And batch insert to GraphDB if we add a method, or just loop.
-        # Let's loop for GraphDB but batch for VectorDB.
-        
-        # Optimize: Disable auto-persist temporarily
-        original_auto_persist = self.graph_db.auto_persist
-        self.graph_db.auto_persist = False
-        
-        prev_node_id = None
-        
-        try:
-            for i, chunk in enumerate(chunks):
-                # Generate ID
-                node_id = str(uuid.uuid4())
-                metadata = {"source": source_id, "chunk_index": i}
-                
-                # Add to GraphDB
-                # We use create_node but we need to avoid the individual vector db add
-                # So we can't use self.create_node directly if we want to batch vector add.
-                # We'll call graph_db.create_node directly.
-                
-                self.graph_db.create_node(
-                    text=chunk,
-                    metadata=metadata,
-                    node_id=node_id
-                )
-                
-                # Collect for VectorDB Batch
-                node_ids.append(node_id)
-                node_texts.append(chunk)
-                # Add ID to metadata for VectorDB
-                vector_meta = metadata.copy()
-                vector_meta['id'] = node_id
-                node_metadatas.append(vector_meta)
-                
-                # Create Edge from previous chunk
-                if prev_node_id:
-                    self.create_edge(EdgeCreate(
-                        source=prev_node_id,
-                        target=node_id,
-                        type="next_chunk",
-                        weight=1.0
-                    ))
-                prev_node_id = node_id
-        finally:
-            # Restore and save
-            self.graph_db.auto_persist = original_auto_persist
-            if self.graph_db.auto_persist:
-                self.graph_db.save()
+        for i, chunk in enumerate(chunks):
+            chunk_id = f"{file.filename}_chunk_{i}"
+            created_ids.append(chunk_id)
             
-        # Batch insert to VectorDB
+            # Create Node
+            self.create_node(NodeCreate(
+                id=chunk_id,
+                text=chunk,
+                metadata={"source": file.filename, "chunk_index": i},
+                regen_embedding=True
+            ))
             
-        # Batch insert to VectorDB
-        if node_ids:
-            self.vector_db.add_documents(node_ids, node_texts, node_metadatas)
+            # Create Edge to previous
+            if prev_id:
+                self.create_edge(EdgeCreate(
+                    source=prev_id,
+                    target=chunk_id,
+                    type="next_chunk",
+                    weight=1.0
+                ))
+            prev_id = chunk_id
             
-        # Force persist GraphDB once if needed, but it auto-persists on create_node currently.
-        # To optimize GraphDB, we would need to disable auto-persist in init and save manually.
-        # But user asked to reduce time "wherever possible".
-        # VectorDB batching is the biggest win.
+        # 5. Hybrid Search
+        # We use default weights from the prompt/requirement if not specified
+        # But here we just want the top result for the PDF test
+        search_res = self.hybrid_search(query, vector_weight=0.5, graph_weight=0.5, top_k=1)
+        
+        if not search_res.results:
+            return None
             
-        # 3. Hybrid Search on this source
-        # We filter by metadata "source": source_id
-        results = self.hybrid_search(
-            query=query,
-            vector_weight=0.7, # Default weights
-            graph_weight=0.3,
-            top_k=5,
-            filter={"source": source_id}
+        top_result = search_res.results[0]
+        
+        # Get text for the result
+        node = self.get_node(top_result.id)
+        text_content = node.text if node else ""
+        
+        # Return in the format expected by test_pdf_flow.py (HybridSearchResult)
+        # {
+        #   "node_id": str,
+        #   "final_score": float,
+        #   "cosine_similarity": float,
+        #   "graph_score": float,
+        #   "text": str
+        # }
+        from app.models import HybridSearchResult
+        return HybridSearchResult(
+            node_id=top_result.id,
+            final_score=top_result.final_score,
+            cosine_similarity=top_result.vector_score,
+            graph_score=top_result.graph_score,
+            text=text_content
         )
-        
-        if not results:
-            # Return empty or raise?
-            # User output format implies we should return something that can be printed.
-            # I'll return a dummy result or raise 404 if not found?
-            # But let's return the top result if exists.
-            # If empty, I'll return an empty object or handle in router.
-            pass
-            
-        return results[0] if results else None
-

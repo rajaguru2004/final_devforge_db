@@ -45,7 +45,7 @@ def query_vector_store(
 
 
 # Define the user's question
-query = "How did Juliet die? Who killed Juliet?"
+query = "what is TTLs?"
 
 print("\n--- Using Max Marginal Relevance (MMR) ---")
 query_vector_store(

@@ -207,113 +207,101 @@ This hybrid Vector + Graph architecture forms a powerful foundation for intellig
 
 By combining vectors for meaning with graphs for structure, this system achieves **significantly more relevant AI-driven retrieval**.
 
-API Endpoints:
-# Hybrid Retrieval System
+---
 
-A production-ready backend service using **FastAPI**, **ChromaDB**, and **NetworkX** for hybrid vector + graph retrieval.
+# DevForge Test Cases
 
-## Features
+Below are the API endpoints tested in `devforge_test_case.py` with their corresponding sample JSON payloads.
 
-- **Node CRUD**: Create, Read, Update, Delete nodes with automatic vector embedding.
-- **Edge CRUD**: Manage relationships between nodes.
-- **Vector Search**: Search nodes using cosine similarity.
-- **Graph Traversal**: BFS traversal to find connected nodes.
-- **Hybrid Search**: Combine vector similarity and graph connectivity scores.
+## 1. Create Node
+**POST** `/nodes`
 
-## Setup
-
-1. **Install Dependencies**:
-   ```bash
-   poetry install
-   ```
-
-2. **Run the Server**:
-   ```bash
-   poetry run uvicorn app.main:app --reload
-   ```
-
-   The API will be available at `http://localhost:8000`.
-   Interactive docs: `http://localhost:8000/docs`.
-
-## API Endpoints & cURL Commands
-
-### 1. Create Node
-```bash
-curl -X POST "http://localhost:8000/nodes" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "text": "Machine learning is a subset of AI.",
-           "metadata": { "source": "doc1" },
-           "auto_embed": true
-         }'
+```json
+{
+    "id": "doc1",
+    "text": "Redis caching strategies",
+    "metadata": { "type": "article", "tags": ["cache", "redis"] },
+    "embedding": null,
+    "regen_embedding": true
+}
 ```
 
-### 2. Get Node
-```bash
-curl "http://localhost:8000/nodes/{node_id}"
+## 2. Get Node
+**GET** `/nodes/{id}`
+
+Example: `/nodes/doc1`
+
+## 3. Update Node
+**PUT** `/nodes/{id}`
+
+```json
+{
+    "text": "Updated redis caching guide",
+    "metadata": { "type": "guide" },
+    "regen_embedding": true
+}
 ```
 
-### 3. Update Node
-```bash
-curl -X PUT "http://localhost:8000/nodes/{node_id}" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "text": "Updated content",
-           "metadata": { "source": "updated_doc" },
-           "regenerate_embedding": true
-         }'
+## 4. Delete Node
+**DELETE** `/nodes/{id}`
+
+Example: `/nodes/doc7`
+
+## 5. Create Edge
+**POST** `/edges`
+
+```json
+{
+    "source": "doc1",
+    "target": "doc4",
+    "type": "related_to",
+    "weight": 0.8
+}
 ```
 
-### 4. Delete Node
-```bash
-curl -X DELETE "http://localhost:8000/nodes/{node_id}"
+## 6. Get Edge
+**GET** `/edges/{id}`
+
+Example: `/edges/{edge_id}`
+
+## 7. Update Edge
+**PUT** `/edges/{id}`
+
+```json
+{
+    "weight": 0.95
+}
 ```
 
-### 5. Create Relationship (Edge)
-```bash
-curl -X POST "http://localhost:8000/edges" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "source": "{source_node_id}",
-           "target": "{target_node_id}",
-           "type": "related_to",
-           "weight": 0.9
-         }'
+## 8. Delete Edge
+**DELETE** `/edges/{id}`
+
+Example: `/edges/{edge_id}`
+
+## 9. Vector Search
+**POST** `/search/vector`
+
+```json
+{
+    "query_text": "redis caching",
+    "top_k": 5,
+    "metadata_filter": { "type": "guide" }
+}
 ```
 
-### 6. Get Relationship
-```bash
-curl "http://localhost:8000/edges/{edge_id}"
-```
+## 10. Graph Traversal
+**GET** `/search/graph`
 
-### 7. Delete Relationship
-```bash
-curl -X DELETE "http://localhost:8000/edges/{edge_id}"
-```
+Example: `/search/graph?start_id=doc6&depth=2`
 
-### 8. Vector Search
-```bash
-curl -X POST "http://localhost:8000/search/vector" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "query_text": "What is machine learning?",
-           "top_k": 5
-         }'
-```
+## 11. Hybrid Search
+**POST** `/search/hybrid`
 
-### 9. Graph Traversal
-```bash
-curl "http://localhost:8000/search/graph?start_id={node_id}&depth=2"
-```
-
-### 10. Hybrid Search
-```bash
-curl -X POST "http://localhost:8000/search/hybrid" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "query_text": "Explain supervised learning",
-           "vector_weight": 0.7,
-           "graph_weight": 0.3,
-           "top_k": 5
-         }'
+```json
+{
+    "query_text": "redis caching",
+    "vector_weight": 0.6,
+    "graph_weight": 0.4,
+    "top_k": 5
+}
 ```

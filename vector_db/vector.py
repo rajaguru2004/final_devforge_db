@@ -1,8 +1,14 @@
 import os
+import logging
+
+# Suppress ChromaDB telemetry and logging
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+logging.getLogger('chromadb').setLevel(logging.ERROR)
+logging.getLogger('posthog').setLevel(logging.ERROR)
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # Define the directory containing the text files and the persistent directory
@@ -12,7 +18,7 @@ db_dir = os.path.join(current_dir, "db")
 persistent_directory = os.path.join(db_dir, "chroma_db_with_metadata")
 
 # ChromaDB batch size limit (using 5000 to be safe, max is ~5461)
-BATCH_SIZE = 5000
+BATCH_SIZE = 500
 
 print(f"Books directory: {books_dir}")
 print(f"Persistent directory: {persistent_directory}")

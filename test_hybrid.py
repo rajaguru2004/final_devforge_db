@@ -179,9 +179,9 @@ def test_qa_accuracy():
     print("="*70)
     
     # Test Case: Who killed Tybalt?
-    query = "Who killed Tybalt?"
-    expected_chunk_id = "chunk_5"
-    expected_text_part = "Romeo kills Tybalt"
+    query = "What is TTLs?"
+    expected_chunk_id = "doc1.txt"
+    expected_text_part = "TTLs is a "
     
     print(f"\nQuery: '{query}'")
     print(f"Expected Chunk: {expected_chunk_id}")
@@ -204,9 +204,9 @@ def test_qa_accuracy():
     contains_answer = expected_text_part in top_result['text']
     
     if is_correct_chunk and contains_answer:
-        print("\n✅ PASSED: Correct answer retrieved as top result")
+        print("\nPASSED: Correct answer retrieved as top result")
     else:
-        print(f"\n❌ FAILED: Expected {expected_chunk_id}, got {top_result['chunk_id']}")
+        print(f"\nFAILED: Expected {expected_chunk_id}, got {top_result['chunk_id']}")
         # Check if it's in top k
         for i, res in enumerate(results):
             if res['chunk_id'] == expected_chunk_id:
