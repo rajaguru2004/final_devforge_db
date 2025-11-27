@@ -1,0 +1,8 @@
+The project is implemented using the poetry
+
+to install any dependencies add the name in pyproject.toml and run poetry install --no-root
+
+to run the project run poetry run python main.py
+
+to add any environment variables add them in the .env file
+
