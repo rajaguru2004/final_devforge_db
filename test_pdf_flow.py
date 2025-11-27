@@ -37,7 +37,7 @@ def test_pdf_search():
         'file': ('CO.pdf', pdf_content, 'application/pdf')
     }
     data = {
-        'query': 'What is notebook?'
+        'query': 'What is workstations?'
     }
     
     print(f"1. Uploading {pdf_path} and Searching...")
@@ -54,6 +54,8 @@ def test_pdf_search():
     print("Top Result:")
     print(f"  Chunk ID: {result['node_id']}")
     print(f"  Final Score: {result['final_score']:.4f}")
+    print(f"  Vector Score: {result['cosine_similarity']:.4f}")
+    print(f"  Graph Score: {result['graph_score']:.4f}")
     print(f"  Text: {result['text'][:200]}...") # Truncate for display
     
     print("\n✅ SUCCESS: Search completed.")

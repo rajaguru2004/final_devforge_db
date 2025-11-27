@@ -242,12 +242,15 @@ class HybridRetrievalService:
         # 1. Vector Search
         vector_results = self.vector_search(query, top_k, filter=filter)
         
-        # 2. Graph Expansion & Scoring
+        # 2. Graph Expansion & Scoring - Optimized with Multi-Source BFS
         # We need to compute graph scores for each vector result
         # Map: node_id -> {cosine_score, graph_score, text, metadata}
         candidates = {}
         
         # Initialize with vector results
+        # We'll use these as starting points for Multi-Source BFS
+        start_nodes = []
+        
         for res in vector_results:
             candidates[res.node_id] = {
                 "text": res.text,
@@ -255,71 +258,54 @@ class HybridRetrievalService:
                 "cosine_similarity": res.cosine_similarity,
                 "graph_score": 0.0
             }
+            start_nodes.append(res.node_id)
             
-        # Expand from vector results
-        # We use the graph_db.compute_graph_scores logic or similar
-        # The prompt implies we use graph traversal/scoring to boost or find related nodes.
-        # "Graph Engine: retrieve neighbors up to depth N, compute graph score"
-        # "Final score = (cosine_sim * vector_weight) + (graph_score * graph_weight)"
-        
-        # Let's use the logic from hybrid_retrieval.py where we expand from the vector hits
-        # and assign scores based on depth/connection.
-        
-        # For each vector hit, we treat it as a start node for graph scoring
-        # We aggregate scores if a node is reached from multiple sources?
-        # Or just take the best?
-        # hybrid_retrieval.py takes max.
+        # Multi-Source BFS
+        # We want to find the minimum depth from ANY start node to other nodes.
+        # Depth 0 (Start Node) -> Score 1.0
+        # Depth 1 -> Score 1.0
+        # Depth 2 -> Score 0.5
         
         graph_scores_map = {} # node_id -> score
+        visited = {} # node_id -> min_depth
         
-        for res in vector_results:
-            # Get scores for neighbors of this hit
-            # We can use a default depth, say 2
-            scores = self.graph_db.compute_graph_scores(res.node_id, depth=2)
+        # Initialize queue with all start nodes at depth 0
+        queue = collections.deque()
+        for nid in start_nodes:
+            if nid not in visited:
+                visited[nid] = 0
+                queue.append((nid, 0))
+                # Score for depth 0
+                graph_scores_map[nid] = 1.0
+        
+        while queue:
+            curr, d = queue.popleft()
             
-            # Normalize graph scores? compute_graph_scores returns raw weights/distance.
-            # hybrid_retrieval.py used a simple 1.0, 0.5, 0.0 scheme.
-            # Let's stick to the simpler scheme from hybrid_retrieval.py for consistency with the "Graph Engine" requirement description 
-            # which might imply the one in the prompt's context (if any).
-            # Actually, the prompt says "compute graph score".
-            # I'll use the `graph_score` function from `hybrid_retrieval.py` logic, adapted here.
+            # Determine score based on depth
+            score = 0.0
+            if d == 0: score = 1.0
+            elif d == 1: score = 1.0
+            elif d == 2: score = 0.5
             
-            # Re-implementing simple depth-based scoring here for clarity and control
-            # Depth 0 (self) = 1.0
-            # Depth 1 = 1.0
-            # Depth 2 = 0.5
-            
-            # BFS for this node
-            local_scores = {}
-            q = collections.deque([(res.node_id, 0)])
-            v = {res.node_id}
-            
-            while q:
-                curr, d = q.popleft()
+            # We only process up to depth 2 for scoring
+            if d > 2:
+                continue
                 
-                score = 0.0
-                if d == 0: score = 1.0
-                elif d == 1: score = 1.0
-                elif d == 2: score = 0.5
-                
-                if curr not in local_scores or score > local_scores[curr]:
-                    local_scores[curr] = score
-                
-                if d < 2:
-                    if curr in self.graph_db.graph:
-                        # Successors and Predecessors? hybrid_retrieval.py used both.
-                        neighbors = set(self.graph_db.graph.successors(curr)) | set(self.graph_db.graph.predecessors(curr))
-                        for n in neighbors:
-                            if n not in v:
-                                v.add(n)
-                                q.append((n, d + 1))
+            # Update score if better (though BFS guarantees we see min depth first, so first visit is best)
+            # But since we have multiple sources, a node might be reached from source A at depth 2 
+            # and later from source B at depth 1? 
+            # No, standard BFS with all sources in initial queue guarantees finding min depth from *any* source first.
+            # So we just assign score on first visit.
+            graph_scores_map[curr] = score
             
-            # Merge into global map
-            for nid, score in local_scores.items():
-                if nid not in graph_scores_map:
-                    graph_scores_map[nid] = score
-                else:
-                    graph_scores_map[nid] = max(graph_scores_map[nid], score)
+            if d < 2:
+                if curr in self.graph_db.graph:
+                    # Expand to neighbors (Successors and Predecessors)
+                    neighbors = set(self.graph_db.graph.successors(curr)) | set(self.graph_db.graph.predecessors(curr))
+                    for n in neighbors:
+                        if n not in visited:
+                            visited[n] = d + 1
+                            queue.append((n, d + 1))
 
         # 3. Combine
         final_candidates = {}
@@ -390,7 +376,7 @@ class HybridRetrievalService:
         with open(txt_path, "w", encoding="utf-8") as f:
             f.write(text)
             
-        # 2. Ingest into DB (Scoped)
+        # 2. Ingest into DB (Scoped) - Optimized with Batching
         # We need to chunk the text and create nodes.
         # We'll use a specific source tag for this file.
         source_id = txt_filename
@@ -402,30 +388,78 @@ class HybridRetrievalService:
         )
         chunks = text_splitter.split_text(text)
         
-        # Create nodes and link them
-        prev_node_id = None
-        created_node_ids = []
+        # Prepare for batch insertion
+        node_ids = []
+        node_texts = []
+        node_metadatas = []
         
-        for i, chunk in enumerate(chunks):
-            # Create Node
-            node_data = NodeCreate(
-                text=chunk,
-                metadata={"source": source_id, "chunk_index": i},
-                auto_embed=True
-            )
-            # We use create_node which handles VectorDB addition
-            node_resp = self.create_node(node_data)
-            created_node_ids.append(node_resp.id)
+        # Create nodes in GraphDB first (in memory/batch if possible, but GraphDB is sequential)
+        # However, we can disable auto-persist on GraphDB temporarily if we had access, 
+        # but here we just iterate. GraphDB operations are relatively fast if not persisting every time.
+        # But VectorDB is the bottleneck.
+        
+        import uuid
+        
+        # We will create GraphNodes manually to get IDs, then batch insert to VectorDB
+        # And batch insert to GraphDB if we add a method, or just loop.
+        # Let's loop for GraphDB but batch for VectorDB.
+        
+        # Optimize: Disable auto-persist temporarily
+        original_auto_persist = self.graph_db.auto_persist
+        self.graph_db.auto_persist = False
+        
+        prev_node_id = None
+        
+        try:
+            for i, chunk in enumerate(chunks):
+                # Generate ID
+                node_id = str(uuid.uuid4())
+                metadata = {"source": source_id, "chunk_index": i}
+                
+                # Add to GraphDB
+                # We use create_node but we need to avoid the individual vector db add
+                # So we can't use self.create_node directly if we want to batch vector add.
+                # We'll call graph_db.create_node directly.
+                
+                self.graph_db.create_node(
+                    text=chunk,
+                    metadata=metadata,
+                    node_id=node_id
+                )
+                
+                # Collect for VectorDB Batch
+                node_ids.append(node_id)
+                node_texts.append(chunk)
+                # Add ID to metadata for VectorDB
+                vector_meta = metadata.copy()
+                vector_meta['id'] = node_id
+                node_metadatas.append(vector_meta)
+                
+                # Create Edge from previous chunk
+                if prev_node_id:
+                    self.create_edge(EdgeCreate(
+                        source=prev_node_id,
+                        target=node_id,
+                        type="next_chunk",
+                        weight=1.0
+                    ))
+                prev_node_id = node_id
+        finally:
+            # Restore and save
+            self.graph_db.auto_persist = original_auto_persist
+            if self.graph_db.auto_persist:
+                self.graph_db.save()
             
-            # Create Edge from previous chunk (Sequential)
-            if prev_node_id:
-                self.create_edge(EdgeCreate(
-                    source=prev_node_id,
-                    target=node_resp.id,
-                    type="next_chunk",
-                    weight=1.0
-                ))
-            prev_node_id = node_resp.id
+        # Batch insert to VectorDB
+            
+        # Batch insert to VectorDB
+        if node_ids:
+            self.vector_db.add_documents(node_ids, node_texts, node_metadatas)
+            
+        # Force persist GraphDB once if needed, but it auto-persists on create_node currently.
+        # To optimize GraphDB, we would need to disable auto-persist in init and save manually.
+        # But user asked to reduce time "wherever possible".
+        # VectorDB batching is the biggest win.
             
         # 3. Hybrid Search on this source
         # We filter by metadata "source": source_id

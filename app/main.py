@@ -1,3 +1,5 @@
+import os
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
 from fastapi import FastAPI
 from app.routers import nodes, edges, search, pdf
 

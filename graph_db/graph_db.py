@@ -147,7 +147,8 @@ class GraphDatabase:
         self,
         text: str,
         metadata: Optional[Dict[str, Any]] = None,
-        embedding: Optional[List[float]] = None
+        embedding: Optional[List[float]] = None,
+        node_id: Optional[str] = None
     ) -> GraphNode:
         """
         Create a new node in the graph.
@@ -156,11 +157,12 @@ class GraphDatabase:
             text: Text content of the node
             metadata: Additional metadata
             embedding: Optional vector embedding
+            node_id: Optional specific ID for the node
             
         Returns:
             Created GraphNode
         """
-        node = GraphNode(text=text, metadata=metadata, embedding=embedding)
+        node = GraphNode(text=text, metadata=metadata, embedding=embedding, node_id=node_id)
         self.graph.add_node(
             node.id,
             text=node.text,
