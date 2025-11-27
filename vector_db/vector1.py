@@ -45,7 +45,7 @@ def query_vector_store(
 
 
 # Define the user's question
-query = "How did Juliet die?"
+query = "How did Juliet die? Who killed Juliet?"
 
 print("\n--- Using Max Marginal Relevance (MMR) ---")
 query_vector_store(
@@ -53,5 +53,14 @@ query_vector_store(
     query,
     embeddings,
     "mmr",
-    {"k": 3, "fetch_k": 20, "lambda_mult": 0.5},
+    {"k": 5, "fetch_k": 50, "lambda_mult": 0.5},
+)
+
+print("\n--- Using Similarity Search ---")
+query_vector_store(
+    "chroma_db_with_metadata",
+    query,
+    embeddings,
+    "similarity",
+    {"k": 5},
 )
