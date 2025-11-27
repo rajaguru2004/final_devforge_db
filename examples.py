@@ -1,344 +1,372 @@
 """
-Example Usage of GraphDB - Comprehensive Demonstration
+Graph Database Examples
 
-This script demonstrates all features of the GraphDB system including:
-- Node and Edge CRUD operations
-- Property-based queries
+Comprehensive examples demonstrating all features of the graph_db module:
+- Node CRUD operations
+- Edge CRUD operations
 - Graph traversal
-- RAG-style semantic search
-- Import/Export functionality
+- Graph-based scoring
+- Persistence (save/load)
 """
 
-from graph_db import GraphDB
+from graph_db import GraphDatabase, GraphNode, GraphRelationship
 
 
-def print_section(title: str):
-    """Helper to print section headers"""
-    print("\n" + "=" * 70)
-    print(f"  {title}")
-    print("=" * 70 + "\n")
+def example_basic_operations():
+    """Example 1: Basic CRUD operations"""
+    print("\n" + "="*60)
+    print("Example 1: Basic Node and Edge CRUD Operations")
+    print("="*60)
+    
+    # Initialize database
+    db = GraphDatabase()
+    
+    # Create nodes
+    print("\n📝 Creating nodes...")
+    node1 = db.create_node(
+        text="Python is a programming language",
+        metadata={"source": "wikipedia", "category": "programming"}
+    )
+    node2 = db.create_node(
+        text="Django is a Python web framework",
+        metadata={"source": "documentation", "category": "framework"}
+    )
+    node3 = db.create_node(
+        text="Flask is a lightweight Python framework",
+        metadata={"source": "documentation", "category": "framework"}
+    )
+    
+    print(f"  ✓ Created {node1}")
+    print(f"  ✓ Created {node2}")
+    print(f"  ✓ Created {node3}")
+    
+    # Create relationships
+    print("\n🔗 Creating relationships...")
+    edge1 = db.create_edge(node2.id, node1.id, "uses", weight=2.0)
+    edge2 = db.create_edge(node3.id, node1.id, "uses", weight=1.5)
+    edge3 = db.create_edge(node2.id, node3.id, "related_to", weight=1.0)
+    
+    print(f"  ✓ Created {edge1}")
+    print(f"  ✓ Created {edge2}")
+    print(f"  ✓ Created {edge3}")
+    
+    # Read operations
+    print("\n🔍 Reading data...")
+    retrieved_node = db.get_node(node1.id)
+    print(f"  Retrieved: {retrieved_node}")
+    print(f"  Text: {retrieved_node.text}")
+    print(f"  Metadata: {retrieved_node.metadata}")
+    
+    # Update operations
+    print("\n✏️  Updating node...")
+    db.update_node(
+        node1.id,
+        metadata={"source": "wikipedia", "category": "programming", "verified": True}
+    )
+    updated_node = db.get_node(node1.id)
+    print(f"  Updated metadata: {updated_node.metadata}")
+    
+    # Stats
+    print("\n📊 Database statistics:")
+    stats = db.get_stats()
+    print(f"  Nodes: {stats['nodes']}")
+    print(f"  Edges: {stats['edges']}")
+    
+    return db
+
+
+def example_traversal(db: GraphDatabase):
+    """Example 2: Graph traversal"""
+    print("\n" + "="*60)
+    print("Example 2: Graph Traversal (BFS)")
+    print("="*60)
+    
+    # Get all nodes for demonstration
+    stats = db.get_stats()
+    all_node_ids = list(db.graph.nodes())
+    
+    if len(all_node_ids) < 3:
+        print("  ⚠️  Need at least 3 nodes for traversal demo")
+        return
+    
+    start_node_id = all_node_ids[1]  # Start from Django node
+    start_node = db.get_node(start_node_id)
+    
+    print(f"\n🚀 Starting traversal from: {start_node.text}")
+    
+    # Traverse with different depths
+    for depth in [1, 2, 3]:
+        reachable = db.traverse(start_node_id, depth)
+        print(f"\n  Depth {depth}: Found {len(reachable)} reachable nodes")
+        for node_id in reachable:
+            node = db.get_node(node_id)
+            print(f"    → {node.text[:50]}")
+
+
+def example_scoring(db: GraphDatabase):
+    """Example 3: Graph-based relevance scoring"""
+    print("\n" + "="*60)
+    print("Example 3: Graph-Based Relevance Scoring")
+    print("="*60)
+    
+    all_node_ids = list(db.graph.nodes())
+    if not all_node_ids:
+        print("  ⚠️  No nodes in database")
+        return
+    
+    start_node_id = all_node_ids[0]
+    start_node = db.get_node(start_node_id)
+    
+    print(f"\n🎯 Computing scores from: {start_node.text}")
+    
+    scores = db.compute_graph_scores(start_node_id, depth=2)
+    
+    # Sort by score
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    
+    print(f"\n  📈 Relevance scores (higher = more relevant):")
+    for node_id, score in sorted_scores:
+        node = db.get_node(node_id)
+        if score == float('inf'):
+            print(f"    {score:.2f}: {node.text[:50]} (starting node)")
+        else:
+            print(f"    {score:.2f}: {node.text[:50]}")
+
+
+def example_persistence():
+    """Example 4: Save and load from JSON"""
+    print("\n" + "="*60)
+    print("Example 4: Persistence (Save/Load)")
+    print("="*60)
+    
+    # Create a new database
+    db = GraphDatabase()
+    
+    print("\n💾 Creating sample graph...")
+    n1 = db.create_node("Machine Learning", {"topic": "AI"})
+    n2 = db.create_node("Deep Learning", {"topic": "AI"})
+    n3 = db.create_node("Neural Networks", {"topic": "AI"})
+    n4 = db.create_node("Computer Vision", {"topic": "AI"})
+    
+    db.create_edge(n2.id, n1.id, "is_subset_of", weight=3.0)
+    db.create_edge(n3.id, n2.id, "foundation_of", weight=2.5)
+    db.create_edge(n4.id, n3.id, "uses", weight=2.0)
+    
+    print(f"  Created graph with {db.get_stats()['nodes']} nodes and {db.get_stats()['edges']} edges")
+    
+    # Save to file
+    filepath = "test_graph.json"
+    print(f"\n💾 Saving graph to {filepath}...")
+    db.save(filepath)
+    print("  ✓ Saved successfully")
+    
+    # Load from file
+    print(f"\n📂 Loading graph from {filepath}...")
+    new_db = GraphDatabase()
+    new_db.load(filepath)
+    print("  ✓ Loaded successfully")
+    
+    # Verify
+    print(f"\n✅ Verification:")
+    print(f"  Original: {db.get_stats()}")
+    print(f"  Loaded:   {new_db.get_stats()}")
+    
+    # Show loaded content
+    print("\n  Loaded nodes:")
+    for node_id in new_db.graph.nodes():
+        node = new_db.get_node(node_id)
+        print(f"    → {node.text}")
+    
+    return new_db
+
+
+def example_knowledge_graph():
+    """Example 5: Real-world knowledge graph for document retrieval"""
+    print("\n" + "="*60)
+    print("Example 5: Document Knowledge Graph (Real-World Use Case)")
+    print("="*60)
+    
+    db = GraphDatabase()
+    
+    print("\n📚 Building knowledge graph for document retrieval...")
+    
+    # Create document nodes
+    doc1 = db.create_node(
+        "Introduction to Python programming and its applications in data science",
+        metadata={"type": "document", "section": "intro", "page": 1},
+        embedding=[0.1, 0.2, 0.3]  # Mock embedding
+    )
+    
+    doc2 = db.create_node(
+        "Python data structures: lists, dictionaries, and sets",
+        metadata={"type": "document", "section": "basics", "page": 5},
+        embedding=[0.15, 0.25, 0.28]
+    )
+    
+    doc3 = db.create_node(
+        "NumPy and Pandas for data manipulation and analysis",
+        metadata={"type": "document", "section": "libraries", "page": 12},
+        embedding=[0.2, 0.3, 0.25]
+    )
+    
+    doc4 = db.create_node(
+        "Building machine learning models with scikit-learn",
+        metadata={"type": "document", "section": "ml", "page": 25},
+        embedding=[0.3, 0.4, 0.2]
+    )
+    
+    doc5 = db.create_node(
+        "Deep learning with TensorFlow and PyTorch",
+        metadata={"type": "document", "section": "deep_learning", "page": 45},
+        embedding=[0.35, 0.45, 0.18]
+    )
+    
+    # Create concept nodes
+    concept_python = db.create_node(
+        "Python Programming Language",
+        metadata={"type": "concept"}
+    )
+    
+    concept_data_science = db.create_node(
+        "Data Science",
+        metadata={"type": "concept"}
+    )
+    
+    concept_ml = db.create_node(
+        "Machine Learning",
+        metadata={"type": "concept"}
+    )
+    
+    # Create relationships
+    print("\n🔗 Creating semantic relationships...")
+    
+    # Documents mention concepts
+    db.create_edge(doc1.id, concept_python.id, "mentions", weight=3.0)
+    db.create_edge(doc1.id, concept_data_science.id, "mentions", weight=2.5)
+    db.create_edge(doc2.id, concept_python.id, "mentions", weight=3.0)
+    db.create_edge(doc3.id, concept_data_science.id, "mentions", weight=3.0)
+    db.create_edge(doc4.id, concept_ml.id, "mentions", weight=3.0)
+    db.create_edge(doc5.id, concept_ml.id, "mentions", weight=3.0)
+    
+    # Sequential document flow
+    db.create_edge(doc1.id, doc2.id, "precedes", weight=1.5)
+    db.create_edge(doc2.id, doc3.id, "precedes", weight=1.5)
+    db.create_edge(doc3.id, doc4.id, "precedes", weight=1.5)
+    db.create_edge(doc4.id, doc5.id, "precedes", weight=1.5)
+    
+    # Related concepts
+    db.create_edge(concept_data_science.id, concept_ml.id, "related_to", weight=2.0)
+    db.create_edge(concept_python.id, concept_data_science.id, "used_in", weight=2.5)
+    
+    stats = db.get_stats()
+    print(f"  ✓ Created {stats['nodes']} nodes and {stats['edges']} edges")
+    
+    # Simulate hybrid search scenario
+    print("\n🔍 Hybrid Search Simulation:")
+    print("  Query: 'machine learning with Python'")
+    print("\n  Step 1: Vector search finds doc4 as most relevant")
+    print(f"    → {doc4.text}")
+    
+    print("\n  Step 2: Graph expansion from doc4 (depth=2)")
+    related_nodes = db.traverse(doc4.id, depth=2)
+    print(f"    → Found {len(related_nodes)} related documents/concepts")
+    
+    print("\n  Step 3: Compute graph-based relevance scores")
+    scores = db.compute_graph_scores(doc4.id, depth=2)
+    
+    # Filter and sort document nodes only
+    doc_scores = {
+        node_id: score for node_id, score in scores.items()
+        if db.get_node(node_id).metadata.get("type") == "document"
+    }
+    sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+    
+    print("\n  📊 Ranked results (combining vector + graph scores):")
+    for i, (node_id, score) in enumerate(sorted_docs[:5], 1):
+        node = db.get_node(node_id)
+        score_str = "∞" if score == float('inf') else f"{score:.2f}"
+        print(f"    {i}. [Score: {score_str}] {node.text}")
+        print(f"       Page {node.metadata['page']}, Section: {node.metadata['section']}")
+    
+    # Save the knowledge graph
+    print("\n💾 Saving knowledge graph...")
+    db.save("knowledge_graph.json")
+    print("  ✓ Saved to knowledge_graph.json")
+    
+    return db
+
+
+def example_delete_operations():
+    """Example 6: Delete operations"""
+    print("\n" + "="*60)
+    print("Example 6: Delete Operations")
+    print("="*60)
+    
+    db = GraphDatabase()
+    
+    # Create test data
+    n1 = db.create_node("Node 1", {"test": True})
+    n2 = db.create_node("Node 2", {"test": True})
+    n3 = db.create_node("Node 3", {"test": True})
+    
+    e1 = db.create_edge(n1.id, n2.id, "links_to", weight=1.0)
+    e2 = db.create_edge(n2.id, n3.id, "links_to", weight=1.0)
+    
+    print(f"\n📊 Initial state: {db.get_stats()}")
+    
+    # Delete an edge
+    print(f"\n🗑️  Deleting edge {e1.id[:8]}...")
+    success = db.delete_edge(e1.id)
+    print(f"  {'✓' if success else '✗'} Edge deleted: {success}")
+    print(f"  New stats: {db.get_stats()}")
+    
+    # Verify edge is gone
+    retrieved_edge = db.get_edge(e1.id)
+    print(f"  Edge retrieval: {retrieved_edge}")
+    
+    # Delete a node (also deletes connected edges)
+    print(f"\n🗑️  Deleting node {n2.id[:8]}...")
+    success = db.delete_node(n2.id)
+    print(f"  {'✓' if success else '✗'} Node deleted: {success}")
+    print(f"  New stats: {db.get_stats()}")
+    
+    # Verify node is gone
+    retrieved_node = db.get_node(n2.id)
+    print(f"  Node retrieval: {retrieved_node}")
 
 
 def main():
-    # Initialize the database
-    db = GraphDB()
-    
-    # ==================== EXAMPLE 1: Creating Nodes ====================
-    print_section("EXAMPLE 1: Creating Nodes")
-    
-    # Create farmers
-    farmer1 = db.create_node(
-        "farmer_001",
-        label="Farmer",
-        properties={"name": "Rajesh Kumar", "age": 45, "experience_years": 20}
-    )
-    print(f"Created: {farmer1}")
-    
-    farmer2 = db.create_node(
-        "farmer_002",
-        label="Farmer",
-        properties={"name": "Priya Sharma", "age": 38, "experience_years": 15}
-    )
-    print(f"Created: {farmer2}")
-    
-    # Create crops
-    crop1 = db.create_node(
-        "crop_001",
-        label="Crop",
-        properties={"name": "Organic Rice", "season": "Kharif", "organic": True}
-    )
-    print(f"Created: {crop1}")
-    
-    crop2 = db.create_node(
-        "crop_002",
-        label="Crop",
-        properties={"name": "Wheat", "season": "Rabi", "organic": False}
-    )
-    print(f"Created: {crop2}")
-    
-    crop3 = db.create_node(
-        "crop_003",
-        label="Crop",
-        properties={"name": "Organic Vegetables", "season": "All Year", "organic": True}
-    )
-    print(f"Created: {crop3}")
-    
-    # Create markets
-    market1 = db.create_node(
-        "market_001",
-        label="Market",
-        properties={"name": "City Wholesale Market", "city": "Mumbai", "price_index": 95}
-    )
-    print(f"Created: {market1}")
-    
-    market2 = db.create_node(
-        "market_002",
-        label="Market",
-        properties={"name": "Organic Farmers Market", "city": "Pune", "price_index": 120}
-    )
-    print(f"Created: {market2}")
-    
-    # Create villages
-    village1 = db.create_node(
-        "village_001",
-        label="Village",
-        properties={"name": "Greenfield Village", "population": 2500}
-    )
-    print(f"Created: {village1}")
-    
-    village2 = db.create_node(
-        "village_002",
-        label="Village",
-        properties={"name": "Riverside Village", "population": 1800}
-    )
-    print(f"Created: {village2}")
-    
-    # Create district
-    district1 = db.create_node(
-        "district_001",
-        label="District",
-        properties={"name": "Satara District", "state": "Maharashtra"}
-    )
-    print(f"Created: {district1}")
-    
-    # ==================== EXAMPLE 2: Adding Relationships ====================
-    print_section("EXAMPLE 2: Adding Relationships")
-    
-    # Farmers grow crops
-    edge1 = db.create_edge("farmer_001", "crop_001", "grows", 
-                          properties={"hectares": 5, "yield_tons": 15})
-    print(f"Created edge: {edge1}")
-    
-    edge2 = db.create_edge("farmer_001", "crop_003", "grows",
-                          properties={"hectares": 2, "yield_tons": 8})
-    print(f"Created edge: {edge2}")
-    
-    edge3 = db.create_edge("farmer_002", "crop_002", "grows",
-                          properties={"hectares": 10, "yield_tons": 30})
-    print(f"Created edge: {edge3}")
-    
-    # Crops sold in markets
-    db.create_edge("crop_001", "market_002", "sold_in",
-                  properties={"price_per_kg": 45, "demand": "high"})
-    print("Created edge: crop_001 -> market_002")
-    
-    db.create_edge("crop_002", "market_001", "sold_in",
-                  properties={"price_per_kg": 25, "demand": "medium"})
-    print("Created edge: crop_002 -> market_001")
-    
-    db.create_edge("crop_003", "market_002", "sold_in",
-                  properties={"price_per_kg": 60, "demand": "high"})
-    print("Created edge: crop_003 -> market_002")
-    
-    # Farmers located in villages
-    db.create_edge("farmer_001", "village_001", "located_in")
-    print("Created edge: farmer_001 -> village_001")
-    
-    db.create_edge("farmer_002", "village_002", "located_in")
-    print("Created edge: farmer_002 -> village_002")
-    
-    # Villages part of district
-    db.create_edge("village_001", "district_001", "part_of")
-    print("Created edge: village_001 -> district_001")
-    
-    db.create_edge("village_002", "district_001", "part_of")
-    print("Created edge: village_002 -> district_001")
-    
-    # ==================== EXAMPLE 3: Updating Properties ====================
-    print_section("EXAMPLE 3: Updating Node and Edge Properties")
-    
-    # Update farmer age
-    updated_farmer = db.update_node("farmer_001", {"age": 46, "certified_organic": True})
-    print(f"Updated farmer: {updated_farmer}")
-    
-    # Update edge property
-    updated_edges = db.update_edge("farmer_001", "crop_001", {"yield_tons": 18})
-    print(f"Updated edge: {updated_edges}")
-    
-    # ==================== EXAMPLE 4: Query - Find All Organic Crops ====================
-    print_section("EXAMPLE 4: Query - Find All Organic Crops")
-    
-    organic_crops = db.find_nodes_by_property("organic", True)
-    print(f"Found {len(organic_crops)} organic crops:")
-    for crop in organic_crops:
-        print(f"  - {crop['name']} ({crop['season']})")
-    
-    # ==================== EXAMPLE 5: Query - Find High-Profit Crop Farmers ====================
-    print_section("EXAMPLE 5: Query - Find Farmers Growing High-Profit Crops")
-    
-    # Find crops sold at price > 40
-    high_profit_farmers = set()
-    
-    for edge in db.graph.edges(data=True, keys=True):
-        from_id, to_id, key, data = edge
-        if data.get('relation') == 'sold_in' and data.get('price_per_kg', 0) > 40:
-            # This is a high-profit crop, find farmers who grow it
-            crop_node = from_id
-            for farmer_edge in db.graph.in_edges(crop_node, data=True, keys=True):
-                f_from, f_to, f_key, f_data = farmer_edge
-                if f_data.get('relation') == 'grows':
-                    farmer_node = db.get_node(f_from)
-                    high_profit_farmers.add(farmer_node['name'])
-                    print(f"  - {farmer_node['name']} grows {db.get_node(crop_node)['name']}")
-    
-    # ==================== EXAMPLE 6: Multi-Hop Traversal ====================
-    print_section("EXAMPLE 6: Multi-Hop Traversal - Markets Connected to Farmer")
-    
-    # Find all markets connected to farmer_001 (multi-hop)
-    traversal_result = db.traverse("farmer_001", depth=3, direction='out')
-    
-    print(f"Starting from: {db.get_node('farmer_001')['name']}")
-    print(f"\nTraversal found {len(traversal_result['nodes'])} nodes:")
-    
-    for node in traversal_result['nodes']:
-        print(f"  - [{node['label']}] {node.get('name', node['node_id'])}")
-    
-    print(f"\nWith {len(traversal_result['edges'])} edges:")
-    for edge in traversal_result['edges'][:5]:  # Show first 5
-        print(f"  - {edge['from']} --[{edge['relation']}]--> {edge['to']}")
-    
-    # ==================== EXAMPLE 7: Relation-Specific Traversal ====================
-    print_section("EXAMPLE 7: Traverse by Specific Relation - 'part_of'")
-    
-    # Start from a village and follow 'part_of' relations
-    relation_traversal = db.traverse_by_relation("village_001", "part_of", depth=2)
-    
-    print(f"Following 'part_of' relation from {db.get_node('village_001')['name']}:")
-    for node in relation_traversal['nodes']:
-        print(f"  - [{node['label']}] {node.get('name', node['node_id'])}")
-    
-    # ==================== EXAMPLE 8: Semantic Hop Search (Mini RAG) ====================
-    print_section("EXAMPLE 8: Semantic Hop Search for 'organic'")
-    
-    rag_result = db.semantic_hop_search("organic", depth=2)
-    
-    print(f"Query: '{rag_result['query']}'")
-    print(f"Found {len(rag_result['matching_nodes'])} direct matches:")
-    for node in rag_result['matching_nodes']:
-        print(f"  - [{node['label']}] {node.get('name', node['node_id'])}")
-    
-    print(f"\nExpanded context includes {rag_result['total_nodes']} nodes and {rag_result['total_edges']} edges")
-    print("\nContext nodes:")
-    for node in rag_result['context_nodes']:
-        print(f"  - [{node['label']}] {node.get('name', node['node_id'])}")
-    
-    # ==================== EXAMPLE 9: Export to JSON ====================
-    print_section("EXAMPLE 9: Export Graph to JSON")
-    
-    json_path = "farm_graph.json"
-    db.save_to_json(json_path)
-    print(f"Graph saved to: {json_path}")
-    print(f"Stats: {db.get_stats()}")
-    
-    # ==================== EXAMPLE 10: Import from JSON ====================
-    print_section("EXAMPLE 10: Import Graph from JSON")
-    
-    # Create new database and load
-    db2 = GraphDB()
-    db2.load_from_json(json_path)
-    print(f"Loaded graph from: {json_path}")
-    print(f"Stats: {db2.get_stats()}")
-    
-    # Verify data
-    farmers = db2.find_nodes_by_label("Farmer")
-    print(f"\nVerified: Found {len(farmers)} farmers in loaded graph")
-    
-    # ==================== EXAMPLE 11: Error Handling ====================
-    print_section("EXAMPLE 11: Error Handling Examples")
-    
-    # Try to create duplicate node
-    try:
-        db.create_node("farmer_001", "Farmer", {"name": "Duplicate"})
-    except Exception as e:
-        print(f"✓ Caught expected error: {type(e).__name__}: {e}")
-    
-    # Try to get non-existent node
-    try:
-        db.get_node("non_existent_node")
-    except Exception as e:
-        print(f"✓ Caught expected error: {type(e).__name__}: {e}")
-    
-    # Try to create edge with non-existent node
-    try:
-        db.create_edge("farmer_001", "non_existent_node", "knows")
-    except Exception as e:
-        print(f"✓ Caught expected error: {type(e).__name__}: {e}")
-    
-    # ==================== EXAMPLE 12: Advanced Queries ====================
-    print_section("EXAMPLE 12: Advanced Queries")
-    
-    # Find all 'grows' relationships
-    grows_edges = db.find_edges_by_relation("grows")
-    print(f"Found {len(grows_edges)} 'grows' relationships:")
-    for edge in grows_edges:
-        farmer = db.get_node(edge['from'])
-        crop = db.get_node(edge['to'])
-        print(f"  - {farmer['name']} grows {crop['name']} "
-              f"({edge.get('hectares', 0)} hectares, {edge.get('yield_tons', 0)} tons)")
-    
-    # Find all nodes in a specific village
-    print("\nFarmers by village:")
-    for village_id in ["village_001", "village_002"]:
-        village = db.get_node(village_id)
-        # Find farmers in this village
-        farmers_in_village = []
-        for from_id, to_id, key, data in db.graph.edges(data=True, keys=True):
-            if to_id == village_id and data.get('relation') == 'located_in':
-                farmer = db.get_node(from_id)
-                farmers_in_village.append(farmer)
-        
-        print(f"  {village['name']}: {[f['name'] for f in farmers_in_village]}")
-    
-    # ==================== EXAMPLE 13: Neighbor Queries ====================
-    print_section("EXAMPLE 13: Neighbor Queries")
-    
-    # Get outgoing neighbors (crops grown by farmer)
-    out_neighbors = db.neighbors("farmer_001", direction='out')
-    print(f"Farmer 001 outgoing neighbors (what they interact with):")
-    for neighbor in out_neighbors:
-        print(f"  - [{neighbor['label']}] {neighbor.get('name', neighbor['node_id'])}")
-    
-    # Get incoming neighbors (who/what connects to this crop)
-    in_neighbors = db.neighbors("crop_001", direction='in')
-    print(f"\nCrop 001 incoming neighbors (who grows it):")
-    for neighbor in in_neighbors:
-        print(f"  - [{neighbor['label']}] {neighbor.get('name', neighbor['node_id'])}")
-    
-    # Get all neighbors (both directions)
-    all_neighbors = db.neighbors("village_001", direction='both')
-    print(f"\nVillage 001 all neighbors:")
-    for neighbor in all_neighbors:
-        print(f"  - [{neighbor['label']}] {neighbor.get('name', neighbor['node_id'])}")
-    
-    # ==================== Final Summary ====================
-    print_section("FINAL SUMMARY")
-    
-    final_stats = db.get_stats()
-    print(f"Graph Database Statistics:")
-    print(f"  Total Nodes: {final_stats['total_nodes']}")
-    print(f"  Total Edges: {final_stats['total_edges']}")
-    print(f"\n  Node Types:")
-    
-    labels = {}
-    for node_id, data in db.graph.nodes(data=True):
-        label = data.get('label', 'Unknown')
-        labels[label] = labels.get(label, 0) + 1
-    
-    for label, count in labels.items():
-        print(f"    - {label}: {count}")
-    
-    print(f"\n  Relationship Types:")
-    relations = {}
-    for from_id, to_id, key, data in db.graph.edges(data=True, keys=True):
-        relation = data.get('relation', 'Unknown')
-        relations[relation] = relations.get(relation, 0) + 1
-    
-    for relation, count in relations.items():
-        print(f"    - {relation}: {count}")
-    
-    print("\n" + "=" * 70)
-    print("  All examples completed successfully!")
-    print("=" * 70 + "\n")
+    """Run all examples"""
+    print("\n" + "🚀"*30)
+    print("GRAPH DATABASE MODULE - COMPREHENSIVE EXAMPLES")
+    print("🚀"*30)
+    
+    # Example 1: Basic CRUD
+    db = example_basic_operations()
+    
+    # Example 2: Traversal
+    example_traversal(db)
+    
+    # Example 3: Scoring
+    example_scoring(db)
+    
+    # Example 4: Persistence
+    loaded_db = example_persistence()
+    
+    # Example 5: Real-world knowledge graph
+    kg_db = example_knowledge_graph()
+    
+    # Example 6: Delete operations
+    example_delete_operations()
+    
+    print("\n" + "="*60)
+    print("✅ ALL EXAMPLES COMPLETED SUCCESSFULLY")
+    print("="*60)
+    print("\n📁 Generated files:")
+    print("  - test_graph.json")
+    print("  - knowledge_graph.json")
+    print("\n📚 Use these examples as templates for your hybrid search system!")
+    print()
 
 
 if __name__ == "__main__":
