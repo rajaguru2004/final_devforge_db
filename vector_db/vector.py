@@ -1,18 +1,18 @@
 import os
-from dotenv import load_dotenv
-from langchain.text_splitter import CharacterTextSplitter
+
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
-# Load environment variables
-load_dotenv()
-
-# Define directories
+# Define the directory containing the text files and the persistent directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir)
-books_dir = os.path.join(project_root, "books")
-persistent_directory = os.path.join(current_dir, "db", "chroma_db_optimized")
+books_dir = os.path.join(current_dir, "books")
+db_dir = os.path.join(current_dir, "db")
+persistent_directory = os.path.join(db_dir, "chroma_db_with_metadata")
+
+# ChromaDB batch size limit (using 5000 to be safe, max is ~5461)
+BATCH_SIZE = 5000
 
 print(f"Books directory: {books_dir}")
 print(f"Persistent directory: {persistent_directory}")
@@ -34,15 +34,21 @@ if not os.path.exists(persistent_directory):
     documents = []
     for book_file in book_files:
         file_path = os.path.join(books_dir, book_file)
-        loader = TextLoader(file_path, encoding='utf-8')
+        loader = TextLoader(file_path)
         book_docs = loader.load()
         for doc in book_docs:
             # Add metadata to each document indicating its source
             doc.metadata = {"source": book_file}
             documents.append(doc)
 
-    # Split the documents into chunks
-    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    # Split the documents into chunks using RecursiveCharacterTextSplitter
+    # for better handling of chunk boundaries
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000, 
+        chunk_overlap=200,
+        length_function=len,
+        separators=["\n\n", "\n", " ", ""]
+    )
     docs = text_splitter.split_documents(documents)
 
     # Display information about the split documents
@@ -53,13 +59,31 @@ if not os.path.exists(persistent_directory):
     print("\n--- Creating embeddings ---")
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )  # Update to a valid embedding model if needed
+    )
     print("\n--- Finished creating embeddings ---")
 
-    # Create the vector store and persist it
+    # Create the vector store and add documents in batches
     print("\n--- Creating and persisting vector store ---")
-    db = Chroma.from_documents(
-        docs, embeddings, persist_directory=persistent_directory)
+    
+    # Create an empty vector store first
+    db = Chroma(
+        persist_directory=persistent_directory,
+        embedding_function=embeddings
+    )
+    
+    # Add documents in batches to avoid exceeding ChromaDB's batch size limit
+    total_docs = len(docs)
+    num_batches = (total_docs + BATCH_SIZE - 1) // BATCH_SIZE  # Ceiling division
+    
+    print(f"Processing {total_docs} documents in {num_batches} batch(es) of max {BATCH_SIZE} documents each")
+    
+    for i in range(0, total_docs, BATCH_SIZE):
+        batch = docs[i:i + BATCH_SIZE]
+        batch_num = (i // BATCH_SIZE) + 1
+        print(f"Adding batch {batch_num}/{num_batches} ({len(batch)} documents)...")
+        db.add_documents(batch)
+        print(f"Batch {batch_num}/{num_batches} completed.")
+    
     print("\n--- Finished creating and persisting vector store ---")
 
 else:
