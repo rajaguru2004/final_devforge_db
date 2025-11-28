@@ -14,6 +14,7 @@ export default function Edges() {
     mutationFn: (data: EdgeCreate) => edgeApi.create(data).then(res => res.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['edges'] })
+      queryClient.invalidateQueries({ queryKey: ['graph-data'] }) // Refresh graph
       setShowCreateModal(false)
     },
   })
@@ -31,6 +32,7 @@ export default function Edges() {
     mutationFn: (id: string) => edgeApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['edges'] })
+      queryClient.invalidateQueries({ queryKey: ['graph-data'] }) // Refresh graph
       setSelectedEdgeId(null)
     },
   })

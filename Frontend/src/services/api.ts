@@ -199,4 +199,30 @@ export const pdfApi = {
   },
 }
 
+// Graph API
+export interface GraphData {
+  nodes: Array<{
+    id: string
+    label: string
+    text: string
+    metadata: Record<string, any>
+  }>
+  edges: Array<{
+    id: string
+    from: string
+    to: string
+    label: string
+    weight: number
+    type: string
+  }>
+  stats: {
+    node_count: number
+    edge_count: number
+  }
+}
+
+export const graphApi = {
+  get: () => api.get<GraphData>('/graph'),
+}
+
 export default api

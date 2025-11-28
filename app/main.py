@@ -2,7 +2,7 @@ import os
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import nodes, edges, search, pdf
+from app.routers import nodes, edges, search, pdf, graph
 
 app = FastAPI(title="Hybrid Retrieval System")
 
@@ -19,6 +19,7 @@ app.include_router(nodes.router)
 app.include_router(edges.router)
 app.include_router(search.router)
 app.include_router(pdf.router)
+app.include_router(graph.router)
 
 @app.get("/")
 def root():

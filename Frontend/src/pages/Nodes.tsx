@@ -14,6 +14,7 @@ export default function Nodes() {
     mutationFn: (data: NodeCreate) => nodeApi.create(data).then(res => res.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nodes'] })
+      queryClient.invalidateQueries({ queryKey: ['graph-data'] }) // Refresh graph
       setShowCreateModal(false)
     },
   })
@@ -31,6 +32,7 @@ export default function Nodes() {
     mutationFn: (id: string) => nodeApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nodes'] })
+      queryClient.invalidateQueries({ queryKey: ['graph-data'] }) // Refresh graph
     },
   })
 
