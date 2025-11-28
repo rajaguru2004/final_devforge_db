@@ -389,8 +389,8 @@ class HybridRetrievalService:
             
         # 3. Chunk Text
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=100
+            chunk_size=400,
+            chunk_overlap=40
         )
         chunks = text_splitter.split_text(text)
         

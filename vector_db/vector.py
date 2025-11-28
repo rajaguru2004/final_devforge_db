@@ -18,7 +18,7 @@ db_dir = os.path.join(current_dir, "db")
 persistent_directory = os.path.join(db_dir, "chroma_db_with_metadata")
 
 # ChromaDB batch size limit (using 5000 to be safe, max is ~5461)
-BATCH_SIZE = 500
+BATCH_SIZE = 400
 
 print(f"Books directory: {books_dir}")
 print(f"Persistent directory: {persistent_directory}")
@@ -50,8 +50,8 @@ if not os.path.exists(persistent_directory):
     # Split the documents into chunks using RecursiveCharacterTextSplitter
     # for better handling of chunk boundaries
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000, 
-        chunk_overlap=100,
+        chunk_size=400, 
+        chunk_overlap=40,
         length_function=len,
         separators=["\n\n", "\n", " ", ""]
     )

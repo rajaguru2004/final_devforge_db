@@ -53,7 +53,7 @@ query_vector_store(
     query,
     embeddings,
     "mmr",
-    {"k": 5, "fetch_k": 50, "lambda_mult": 0.5},
+    {"k": 2, "fetch_k": 50, "lambda_mult": 0.5},
 )
 
 print("\n--- Using Similarity Search ---")
@@ -62,5 +62,5 @@ query_vector_store(
     query,
     embeddings,
     "similarity",
-    {"k": 5},
+    {"k": 2},
 )
