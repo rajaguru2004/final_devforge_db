@@ -22,7 +22,7 @@ def example_basic_operations():
     db = GraphDatabase()
     
     # Create nodes
-    print("\n📝 Creating nodes...")
+    print("\n Creating nodes...")
     node1 = db.create_node(
         text="Python is a programming language",
         metadata={"source": "wikipedia", "category": "programming"}
@@ -41,7 +41,7 @@ def example_basic_operations():
     print(f"  ✓ Created {node3}")
     
     # Create relationships
-    print("\n🔗 Creating relationships...")
+    print("\n Creating relationships...")
     edge1 = db.create_edge(node2.id, node1.id, "uses", weight=2.0)
     edge2 = db.create_edge(node3.id, node1.id, "uses", weight=1.5)
     edge3 = db.create_edge(node2.id, node3.id, "related_to", weight=1.0)
@@ -51,14 +51,14 @@ def example_basic_operations():
     print(f"  ✓ Created {edge3}")
     
     # Read operations
-    print("\n🔍 Reading data...")
+    print("\n Reading data...")
     retrieved_node = db.get_node(node1.id)
     print(f"  Retrieved: {retrieved_node}")
     print(f"  Text: {retrieved_node.text}")
     print(f"  Metadata: {retrieved_node.metadata}")
     
     # Update operations
-    print("\n✏️  Updating node...")
+    print("\n Updating node...")
     db.update_node(
         node1.id,
         metadata={"source": "wikipedia", "category": "programming", "verified": True}
@@ -67,7 +67,7 @@ def example_basic_operations():
     print(f"  Updated metadata: {updated_node.metadata}")
     
     # Stats
-    print("\n📊 Database statistics:")
+    print("\nDatabase statistics:")
     stats = db.get_stats()
     print(f"  Nodes: {stats['nodes']}")
     print(f"  Edges: {stats['edges']}")
@@ -86,13 +86,13 @@ def example_traversal(db: GraphDatabase):
     all_node_ids = list(db.graph.nodes())
     
     if len(all_node_ids) < 3:
-        print("  ⚠️  Need at least 3 nodes for traversal demo")
+        print("    Need at least 3 nodes for traversal demo")
         return
     
     start_node_id = all_node_ids[1]  # Start from Django node
     start_node = db.get_node(start_node_id)
     
-    print(f"\n🚀 Starting traversal from: {start_node.text}")
+    print(f"\n Starting traversal from: {start_node.text}")
     
     # Traverse with different depths
     for depth in [1, 2, 3]:
@@ -111,20 +111,20 @@ def example_scoring(db: GraphDatabase):
     
     all_node_ids = list(db.graph.nodes())
     if not all_node_ids:
-        print("  ⚠️  No nodes in database")
+        print("   No nodes in database")
         return
     
     start_node_id = all_node_ids[0]
     start_node = db.get_node(start_node_id)
     
-    print(f"\n🎯 Computing scores from: {start_node.text}")
+    print(f"\nComputing scores from: {start_node.text}")
     
     scores = db.compute_graph_scores(start_node_id, depth=2)
     
     # Sort by score
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     
-    print(f"\n  📈 Relevance scores (higher = more relevant):")
+    print(f"\n Relevance scores (higher = more relevant):")
     for node_id, score in sorted_scores:
         node = db.get_node(node_id)
         if score == float('inf'):
@@ -142,7 +142,7 @@ def example_persistence():
     # Create a new database
     db = GraphDatabase()
     
-    print("\n💾 Creating sample graph...")
+    print("\nCreating sample graph...")
     n1 = db.create_node("Machine Learning", {"topic": "AI"})
     n2 = db.create_node("Deep Learning", {"topic": "AI"})
     n3 = db.create_node("Neural Networks", {"topic": "AI"})
@@ -156,18 +156,18 @@ def example_persistence():
     
     # Save to file
     filepath = "test_graph.json"
-    print(f"\n💾 Saving graph to {filepath}...")
+    print(f"\nSaving graph to {filepath}...")
     db.save(filepath)
     print("  ✓ Saved successfully")
     
     # Load from file
-    print(f"\n📂 Loading graph from {filepath}...")
+    print(f"\nLoading graph from {filepath}...")
     new_db = GraphDatabase()
     new_db.load(filepath)
     print("  ✓ Loaded successfully")
     
     # Verify
-    print(f"\n✅ Verification:")
+    print(f"\nVerification:")
     print(f"  Original: {db.get_stats()}")
     print(f"  Loaded:   {new_db.get_stats()}")
     
@@ -188,7 +188,7 @@ def example_knowledge_graph():
     
     db = GraphDatabase()
     
-    print("\n📚 Building knowledge graph for document retrieval...")
+    print("\n Building knowledge graph for document retrieval...")
     
     # Create document nodes
     doc1 = db.create_node(
@@ -238,7 +238,7 @@ def example_knowledge_graph():
     )
     
     # Create relationships
-    print("\n🔗 Creating semantic relationships...")
+    print("\nCreating semantic relationships...")
     
     # Documents mention concepts
     db.create_edge(doc1.id, concept_python.id, "mentions", weight=3.0)
@@ -259,10 +259,10 @@ def example_knowledge_graph():
     db.create_edge(concept_python.id, concept_data_science.id, "used_in", weight=2.5)
     
     stats = db.get_stats()
-    print(f"  ✓ Created {stats['nodes']} nodes and {stats['edges']} edges")
+    print(f"  Created {stats['nodes']} nodes and {stats['edges']} edges")
     
     # Simulate hybrid search scenario
-    print("\n🔍 Hybrid Search Simulation:")
+    print("\nHybrid Search Simulation:")
     print("  Query: 'machine learning with Python'")
     print("\n  Step 1: Vector search finds doc4 as most relevant")
     print(f"    → {doc4.text}")
@@ -281,7 +281,7 @@ def example_knowledge_graph():
     }
     sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
     
-    print("\n  📊 Ranked results (combining vector + graph scores):")
+    print("\n  Ranked results (combining vector + graph scores):")
     for i, (node_id, score) in enumerate(sorted_docs[:5], 1):
         node = db.get_node(node_id)
         score_str = "∞" if score == float('inf') else f"{score:.2f}"
@@ -289,7 +289,7 @@ def example_knowledge_graph():
         print(f"       Page {node.metadata['page']}, Section: {node.metadata['section']}")
     
     # Save the knowledge graph
-    print("\n💾 Saving knowledge graph...")
+    print("\n Saving knowledge graph...")
     db.save("knowledge_graph.json")
     print("  ✓ Saved to knowledge_graph.json")
     
@@ -312,12 +312,12 @@ def example_delete_operations():
     e1 = db.create_edge(n1.id, n2.id, "links_to", weight=1.0)
     e2 = db.create_edge(n2.id, n3.id, "links_to", weight=1.0)
     
-    print(f"\n📊 Initial state: {db.get_stats()}")
+    print(f"\n Initial state: {db.get_stats()}")
     
     # Delete an edge
-    print(f"\n🗑️  Deleting edge {e1.id[:8]}...")
+    print(f"\n Deleting edge {e1.id[:8]}...")
     success = db.delete_edge(e1.id)
-    print(f"  {'✓' if success else '✗'} Edge deleted: {success}")
+    print(f"  {'yes' if success else '✗'} Edge deleted: {success}")
     print(f"  New stats: {db.get_stats()}")
     
     # Verify edge is gone
@@ -325,9 +325,9 @@ def example_delete_operations():
     print(f"  Edge retrieval: {retrieved_edge}")
     
     # Delete a node (also deletes connected edges)
-    print(f"\n🗑️  Deleting node {n2.id[:8]}...")
+    print(f"\n Deleting node {n2.id[:8]}...")
     success = db.delete_node(n2.id)
-    print(f"  {'✓' if success else '✗'} Node deleted: {success}")
+    print(f"  {'yes' if success else '✗'} Node deleted: {success}")
     print(f"  New stats: {db.get_stats()}")
     
     # Verify node is gone
@@ -337,9 +337,9 @@ def example_delete_operations():
 
 def main():
     """Run all examples"""
-    print("\n" + "🚀"*30)
+    print("\n" + ""*30)
     print("GRAPH DATABASE MODULE - COMPREHENSIVE EXAMPLES")
-    print("🚀"*30)
+    print(""*30)
     
     # Example 1: Basic CRUD
     db = example_basic_operations()
@@ -360,12 +360,12 @@ def main():
     example_delete_operations()
     
     print("\n" + "="*60)
-    print("✅ ALL EXAMPLES COMPLETED SUCCESSFULLY")
+    print(" ALL EXAMPLES COMPLETED SUCCESSFULLY")
     print("="*60)
-    print("\n📁 Generated files:")
+    print("\nGenerated files:")
     print("  - test_graph.json")
     print("  - knowledge_graph.json")
-    print("\n📚 Use these examples as templates for your hybrid search system!")
+    print("\n Use these examples as templates for your hybrid search system!")
     print()
 
 

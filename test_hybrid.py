@@ -1,12 +1,4 @@
-"""
-Comprehensive Test & Demonstration of Hybrid Retrieval System
 
-Tests all components:
-- Vector search
-- Graph scoring
-- Hybrid ranking
-- End-to-end pipeline
-"""
 
 import json
 from hybrid_retrieval import (
@@ -21,7 +13,7 @@ from hybrid_retrieval import (
 
 
 def test_vector_search():
-    """Test vector search component"""
+    
     print("\n" + "="*70)
     print("TEST 1: Vector Search")
     print("="*70)
@@ -38,11 +30,11 @@ def test_vector_search():
         print(f"   Text: {text[:100]}...\n")
     
     assert len(results) > 0, "Vector search returned no results"
-    print("✅ PASSED: Vector search working correctly")
+    print("PASSED: Vector search working correctly")
 
 
 def test_graph_scoring():
-    """Test graph scoring component"""
+  
     print("\n" + "="*70)
     print("TEST 2: Graph Scoring")
     print("="*70)
@@ -59,7 +51,7 @@ def test_graph_scoring():
     
     assert len(scores) > 0, "Graph scoring returned no results"
     assert scores.get(test_node) == 1.0, "Starting node should have score 1.0"
-    print("\n✅ PASSED: Graph scoring working correctly")
+    print("\nPASSED: Graph scoring working correctly")
 
 
 def test_hybrid_ranking():
@@ -103,7 +95,7 @@ def test_hybrid_ranking():
     for i in range(len(results) - 1):
         assert results[i]['final_score'] >= results[i+1]['final_score'], "Results not sorted"
     
-    print("\n✅ PASSED: Hybrid ranking working correctly")
+    print("\nPASSED: Hybrid ranking working correctly")
 
 
 def test_hybrid_retrieve():
@@ -137,7 +129,7 @@ def test_hybrid_retrieve():
     json_output = json.dumps(results, indent=2, ensure_ascii=False)
     assert json_output, "Failed to serialize to JSON"
     
-    print("\n✅ PASSED: End-to-end retrieval working correctly")
+    print("\nPASSED: End-to-end retrieval working correctly")
 
 
 def test_output_format():
@@ -167,9 +159,9 @@ def test_output_format():
         assert isinstance(result['final_score'], (int, float)), "final_score should be numeric"
         assert isinstance(result['text'], str), "text should be string"
         
-        print("\n✅ PASSED: Output format matches specification")
+        print("\nPASSED: Output format matches specification")
     else:
-        print("\n⚠️  SKIPPED: No results to validate (may need to run setup_graph.py first)")
+        print("\nSKIPPED: No results to validate (may need to run setup_graph.py first)")
 
 
 def test_qa_accuracy():
@@ -190,7 +182,7 @@ def test_qa_accuracy():
     results = hybrid_retrieve(query, top_k=3)
     
     if not results:
-        print("❌ FAILED: No results returned")
+        print("FAILED: No results returned")
         return
 
     top_result = results[0]
@@ -231,18 +223,18 @@ def run_all_tests():
         print("ALL TESTS PASSED! ✅")
         print("="*70)
         print("\nHybrid Retrieval System is fully functional:")
-        print("  ✓ Vector search (ChromaDB)")
-        print("  ✓ Graph scoring (NetworkX)")
-        print("  ✓ Hybrid ranking (0.7/0.3 formula)")
-        print("  ✓ End-to-end pipeline")
-        print("  ✓ JSON output format")
+        print("  Vector search (ChromaDB)")
+        print("  Graph scoring (NetworkX)")
+        print("  Hybrid ranking (0.7/0.3 formula)")
+        print("  End-to-end pipeline")
+        print("  JSON output format")
         print("="*70 + "\n")
         
     except AssertionError as e:
-        print(f"\n❌ TEST FAILED: {e}")
+        print(f"\n TEST FAILED: {e}")
         raise
     except Exception as e:
-        print(f"\n❌ ERROR: {e}")
+        print(f"\nERROR: {e}")
         raise
 
 

@@ -54,7 +54,7 @@ def setup_graph_database():
             metadata={"source": "Romeo and Juliet", "type": "chunk"},
             embedding=None
         )
-        print(f"  ✓ Created: {node_data['id']}")
+        print(f"  Created: {node_data['id']}")
     
     print("\nCreating relationships...")
     

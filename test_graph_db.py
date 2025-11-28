@@ -9,10 +9,10 @@ def test_imports():
     print("Testing imports...")
     try:
         from graph_db import GraphDatabase, GraphNode, GraphRelationship
-        print("✓ All imports successful")
+        print(" All imports successful")
         return True
     except ImportError as e:
-        print(f"✗ Import failed: {e}")
+        print(f"Import failed: {e}")
         return False
 
 
@@ -26,13 +26,13 @@ def test_node_operations():
     # Create
     node = db.create_node("Test node", {"key": "value"})
     assert node is not None, "Node creation failed"
-    print(f"✓ Created node: {node.id[:8]}...")
+    print(f" Created node: {node.id[:8]}...")
     
     # Read
     retrieved = db.get_node(node.id)
     assert retrieved is not None, "Node retrieval failed"
     assert retrieved.text == "Test node", "Text mismatch"
-    print(f"✓ Retrieved node correctly")
+    print(f" Retrieved node correctly")
     
     # Update
     success = db.update_node(node.id, text="Updated text")
@@ -40,14 +40,14 @@ def test_node_operations():
     updated = db.get_node(node.id)
     assert updated is not None, "Update not saved"
     assert updated.text == "Updated text", "Update not saved"
-    print(f"✓ Updated node successfully")
+    print(f" Updated node successfully")
     
     # Delete
     success = db.delete_node(node.id)
     assert success, "Node deletion failed"
     deleted = db.get_node(node.id)
     assert deleted is None, "Node still exists after deletion"
-    print(f"✓ Deleted node successfully")
+    print(f" Deleted node successfully")
     
     return True
 
@@ -66,7 +66,7 @@ def test_edge_operations():
     # Create edge
     edge = db.create_edge(n1.id, n2.id, "links_to", weight=2.5)
     assert edge is not None, "Edge creation failed"
-    print(f"✓ Created edge: {edge.id[:8]}...")
+    print(f" Created edge: {edge.id[:8]}...")
     
     # Read edge
     retrieved = db.get_edge(edge.id)
@@ -74,14 +74,14 @@ def test_edge_operations():
     assert retrieved.source == n1.id, "Source mismatch"
     assert retrieved.target == n2.id, "Target mismatch"
     assert retrieved.weight == 2.5, "Weight mismatch"
-    print(f"✓ Retrieved edge correctly")
+    print(f" Retrieved edge correctly")
     
     # Delete edge
     success = db.delete_edge(edge.id)
     assert success, "Edge deletion failed"
     deleted = db.get_edge(edge.id)
     assert deleted is None, "Edge still exists after deletion"
-    print(f"✓ Deleted edge successfully")
+    print(f" Deleted edge successfully")
     
     return True
 
@@ -104,11 +104,11 @@ def test_traversal():
     # Traverse from n1
     nodes_depth1 = db.traverse(n1.id, depth=1)
     assert len(nodes_depth1) >= 2, f"Expected >=2 nodes at depth 1, got {len(nodes_depth1)}"
-    print(f"✓ Depth 1 traversal: {len(nodes_depth1)} nodes")
+    print(f" Depth 1 traversal: {len(nodes_depth1)} nodes")
     
     nodes_depth2 = db.traverse(n1.id, depth=2)
     assert len(nodes_depth2) == 3, f"Expected 3 nodes at depth 2, got {len(nodes_depth2)}"
-    print(f"✓ Depth 2 traversal: {len(nodes_depth2)} nodes")
+    print(f" Depth 2 traversal: {len(nodes_depth2)} nodes")
     
     return True
 
@@ -142,7 +142,7 @@ def test_scoring():
     # Higher weight edge should have higher score
     assert scores[n2.id] > scores[n3.id], "Score should correlate with edge weight"
     
-    print(f"✓ Scoring works correctly")
+    print(f" Scoring works correctly")
     print(f"  Scores: {n1.id[:8]}=∞, {n2.id[:8]}={scores[n2.id]:.2f}, {n3.id[:8]}={scores[n3.id]:.2f}")
     
     return True
@@ -167,7 +167,7 @@ def test_persistence():
     filepath = "test_persistence.json"
     db.save(filepath)
     assert os.path.exists(filepath), "Save file not created"
-    print(f"✓ Saved to {filepath}")
+    print(f" Saved to {filepath}")
     
     # Load
     new_db = GraphDatabase(db_path=filepath, auto_persist=False)
@@ -175,7 +175,7 @@ def test_persistence():
     loaded_stats = new_db.get_stats()
     
     assert original_stats == loaded_stats, "Stats mismatch after load"
-    print(f"✓ Loaded successfully")
+    print(f" Loaded successfully")
     print(f"  Stats: {loaded_stats}")
     
     # Cleanup
@@ -206,7 +206,7 @@ def test_large_chunk_ingestion():
         metadata = {"chunk_index": i + 1, "length": len(text)}
         node = db.create_node(text, metadata)
         node_ids.append(node.id)
-        print(f"✓ Created node {i+1}: {node.id[:8]}, length={metadata['length']}")
+        print(f" Created node {i+1}: {node.id[:8]}, length={metadata['length']}")
 
     # Create edges : chunk1 -> chunk2 -> chunk3 -> chunk4
     edge_ids = []
@@ -219,7 +219,7 @@ def test_large_chunk_ingestion():
         )
         assert edge is not None, "Edge creation failed"
         edge_ids.append(edge.id)
-        print(f"✓ Linked {node_ids[i][:8]} -> {node_ids[i+1][:8]}")
+        print(f" Linked {node_ids[i][:8]} -> {node_ids[i+1][:8]}")
 
     # Validate graph structure
     assert len(node_ids) == 4, "Expected 4 nodes"
@@ -237,7 +237,7 @@ def test_large_chunk_ingestion():
     stats = db.get_stats()
     print(stats)
 
-    print("✓ Large chunk ingestion test passed!")
+    print(" Large chunk ingestion test passed!")
     return True
 
 
@@ -268,13 +268,13 @@ def main():
     #         result = test_func()
     #         if result:
     #             passed += 1
-    #             print(f"✅ {name} PASSED")
+    #             print(f"{name} PASSED")
     #         else:
     #             failed += 1
-    #             print(f"❌ {name} FAILED")
+    #             print(f" {name} FAILED")
     #     except Exception as e:
     #         failed += 1
-    #         print(f"❌ {name} FAILED with exception: {e}")
+    #         print(f" {name} FAILED with exception: {e}")
     #         import traceback
     #         traceback.print_exc()
     
@@ -283,10 +283,10 @@ def main():
     # print("="*60)
     
     # if failed == 0:
-    #     print("\n🎉 All tests passed! Graph database is working correctly.")
+    #     print("\nAll tests passed! Graph database is working correctly.")
     #     return 0
     # else:
-    #     print(f"\n⚠️  {failed} test(s) failed. Please review the errors above.")
+    #     print(f"\n{failed} test(s) failed. Please review the errors above.")
     #     return 1
 
 

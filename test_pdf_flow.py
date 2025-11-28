@@ -26,7 +26,7 @@ def test_pdf_search():
     pdf_path = "vector_db/books/CO.pdf"
     
     if not os.path.exists(pdf_path):
-        print(f"❌ FAILED: File {pdf_path} not found.")
+        print(f"FAILED: File {pdf_path} not found.")
         return
 
     # Read the file
@@ -44,7 +44,7 @@ def test_pdf_search():
     response = client.post("/pdf/search", files=files, data=data)
     
     if response.status_code != 200:
-        print(f"❌ FAILED: Status Code {response.status_code}")
+        print(f" FAILED: Status Code {response.status_code}")
         print(response.text)
         return
 
@@ -58,7 +58,7 @@ def test_pdf_search():
     print(f"  Graph Score: {result['graph_score']:.4f}")
     print(f"  Text: {result['text'][:200]}...") # Truncate for display
     
-    print("\n✅ SUCCESS: Search completed.")
+    print("\nSUCCESS: Search completed.")
 
 if __name__ == "__main__":
     test_pdf_search()

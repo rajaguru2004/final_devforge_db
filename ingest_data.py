@@ -105,7 +105,7 @@ def ingest_data():
     # We use the IDs argument to ensure Chroma uses our custom IDs
     ids = [item["id"] for item in data]
     vector_db.add_documents(documents, ids=ids)
-    print("✓ Vector DB populated")
+    print(" Vector DB populated")
     
     # 3. Populate GraphDB (Graph Store)
     print("\nInitializing GraphDB...")
@@ -148,7 +148,7 @@ def ingest_data():
             metadata=item["metadata"],
             embedding=None
         )
-        print(f"  ✓ Node: {item['id']}")
+        print(f"  Node: {item['id']}")
 
     # 4. Create Relationships
     print("\nCreating relationships...")
@@ -169,10 +169,10 @@ def ingest_data():
     
     for source, target, rel, weight in relationships:
         graph_db.create_edge(source, target, rel, weight)
-        print(f"  ✓ Edge: {source} -> {target} ({rel})")
+        print(f"  Edge: {source} -> {target} ({rel})")
         
     graph_db.persist()
-    print("\n✓ Graph DB populated")
+    print("\n Graph DB populated")
     
     print("\n" + "="*60)
     print("INGESTION COMPLETE")
