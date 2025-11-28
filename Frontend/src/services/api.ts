@@ -9,41 +9,54 @@ const api = axios.create({
   },
 })
 
-// Types
+// ==================== Node Types ====================
+
+export interface NodeCreate {
+  id: string
+  text: string
+  metadata?: Record<string, any>
+  embedding?: number[]
+  regen_embedding?: boolean
+}
+
+export interface NodeCreateResponse {
+  status: string
+  id: string
+  embedding_dim?: number
+}
+
 export interface Node {
   id: string
   text: string
   metadata: Record<string, any>
-  embedding_created?: boolean
-  relationships?: Relationship[]
-}
-
-export interface Relationship {
-  target: string
-  type: string
-  weight?: number
-}
-
-export interface NodeCreate {
-  text: string
-  metadata?: Record<string, any>
-  auto_embed?: boolean
+  embedding?: number[] | null
+  edges?: Array<{
+    edge_id: string
+    target: string
+    type: string
+    weight: number
+  }>
 }
 
 export interface NodeUpdate {
   text?: string
   metadata?: Record<string, any>
-  regenerate_embedding?: boolean
+  regen_embedding?: boolean
 }
 
-export interface Edge {
-  edge_id: string
-  source: string
-  target: string
-  type: string
-  weight?: number
-  status?: string
+export interface NodeUpdateResponse {
+  status: string
+  id: string
+  embedding_regenerated: boolean
 }
+
+export interface NodeDeleteResponse {
+  status: string
+  id: string
+  removed_edges_count: number
+}
+
+// ==================== Edge Types ====================
 
 export interface EdgeCreate {
   source: string
@@ -52,24 +65,64 @@ export interface EdgeCreate {
   weight?: number
 }
 
-export interface VectorSearchRequest {
-  query_text: string
-  top_k: number
+export interface EdgeCreateResponse {
+  status: string
+  edge_id: string
+  source: string
+  target: string
 }
 
-export interface VectorSearchResult {
-  node_id: string
-  text: string
-  cosine_similarity: number
-  metadata: Record<string, any>
+export interface Edge {
+  edge_id: string
+  source: string
+  target: string
+  type: string
+  weight: number
+}
+
+export interface EdgeUpdate {
+  weight: number
+}
+
+export interface EdgeUpdateResponse {
+  status: string
+  edge_id: string
+  new_weight: number
+}
+
+export interface EdgeDeleteResponse {
+  status: string
+  edge_id: string
+}
+
+// ==================== Search Types ====================
+
+export interface VectorSearchRequest {
+  query_text: string
+  top_k?: number
+  metadata_filter?: Record<string, any>
+}
+
+export interface VectorSearchResultItem {
+  id: string
+  vector_score: number
+}
+
+export interface VectorSearchResponse {
+  query_text: string
+  results: VectorSearchResultItem[]
 }
 
 export interface GraphTraversalResponse {
-  start: string
+  start_id: string
   depth: number
-  results: Array<{
-    node_id: string
-    depth: number
+  nodes: Array<{
+    id: string
+    hop: number
+    edge?: string
+    weight?: number
+    edge_path?: string[]
+    weights?: number[]
   }>
 }
 
@@ -80,36 +133,56 @@ export interface HybridSearchRequest {
   top_k?: number
 }
 
-export interface HybridSearchResult {
-  node_id: string
-  text: string
-  cosine_similarity: number
+export interface HybridSearchResultItem {
+  id: string
+  vector_score: number
   graph_score: number
   final_score: number
-  metadata: Record<string, any>
+  info: Record<string, any>
 }
+
+export interface HybridSearchResponse {
+  query_text: string
+  vector_weight: number
+  graph_weight: number
+  results: HybridSearchResultItem[]
+}
+
+export interface HybridSearchResult {
+  node_id: string
+  final_score: number
+  cosine_similarity: number
+  graph_score: number
+  text: string
+}
+
+// ==================== API Functions ====================
 
 // Node APIs
 export const nodeApi = {
-  create: (data: NodeCreate) => api.post<Node>('/nodes', data),
+  create: (data: NodeCreate) => api.post<NodeCreateResponse>('/nodes', data),
   get: (id: string) => api.get<Node>(`/nodes/${id}`),
-  update: (id: string, data: NodeUpdate) => api.put(`/nodes/${id}`, data),
-  delete: (id: string) => api.delete(`/nodes/${id}`),
+  update: (id: string, data: NodeUpdate) => api.put<NodeUpdateResponse>(`/nodes/${id}`, data),
+  delete: (id: string) => api.delete<NodeDeleteResponse>(`/nodes/${id}`),
 }
 
 // Edge APIs
 export const edgeApi = {
-  create: (data: EdgeCreate) => api.post<Edge>('/edges', data),
+  create: (data: EdgeCreate) => api.post<EdgeCreateResponse>('/edges', data),
   get: (id: string) => api.get<Edge>(`/edges/${id}`),
-  delete: (id: string) => api.delete(`/edges/${id}`),
+  update: (id: string, data: EdgeUpdate) => api.put<EdgeUpdateResponse>(`/edges/${id}`, data),
+  delete: (id: string) => api.delete<EdgeDeleteResponse>(`/edges/${id}`),
 }
 
 // Search APIs
 export const searchApi = {
-  vector: (data: VectorSearchRequest) => api.post<VectorSearchResult[]>('/search/vector', data),
-  graph: (startId: string, depth: number = 2) => 
-    api.get<GraphTraversalResponse>(`/search/graph?start_id=${startId}&depth=${depth}`),
-  hybrid: (data: HybridSearchRequest) => api.post<HybridSearchResult[]>('/search/hybrid', data),
+  vector: (data: VectorSearchRequest) => api.post<VectorSearchResponse>('/search/vector', data),
+  graph: (startId: string, depth: number = 2, typeFilter?: string) => {
+    const params = new URLSearchParams({ start_id: startId, depth: depth.toString() })
+    if (typeFilter) params.append('type_filter', typeFilter)
+    return api.get<GraphTraversalResponse>(`/search/graph?${params.toString()}`)
+  },
+  hybrid: (data: HybridSearchRequest) => api.post<HybridSearchResponse>('/search/hybrid', data),
 }
 
 // PDF API
@@ -127,4 +200,3 @@ export const pdfApi = {
 }
 
 export default api
-

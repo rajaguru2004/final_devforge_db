@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Upload, FileText, Search } from 'lucide-react'
-import { pdfApi, type HybridSearchResult } from '../services/api'
+import { pdfApi, nodeApi, type HybridSearchResult } from '../services/api'
 
 export default function PDFUpload() {
   const [file, setFile] = useState<File | null>(null)
@@ -51,6 +51,13 @@ export default function PDFUpload() {
     }
     uploadMutation.mutate({ file, query })
   }
+
+  // Fetch node details for the result
+  const { data: resultNode } = useQuery({
+    queryKey: ['node', uploadMutation.data?.node_id],
+    queryFn: () => nodeApi.get(uploadMutation.data!.node_id).then(res => res.data),
+    enabled: !!uploadMutation.data?.node_id,
+  })
 
   return (
     <div className="space-y-6">
@@ -160,7 +167,10 @@ export default function PDFUpload() {
       {uploadMutation.data && (
         <div className="card">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Search Result</h2>
-          <SearchResultCard result={uploadMutation.data} />
+          <SearchResultCard 
+            result={uploadMutation.data} 
+            nodeData={resultNode}
+          />
         </div>
       )}
 
@@ -175,18 +185,22 @@ export default function PDFUpload() {
   )
 }
 
-function SearchResultCard({ result }: { result: HybridSearchResult }) {
+function SearchResultCard({ result, nodeData }: { result: HybridSearchResult; nodeData?: any }) {
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1">
           <div className="flex items-center space-x-2 mb-2">
-            <span className="text-xs font-mono text-gray-500">ID: {result.node_id.slice(0, 8)}...</span>
+            <span className="text-xs font-mono text-gray-500">ID: {result.node_id}</span>
             <span className="px-2 py-1 bg-primary-100 text-primary-700 text-xs rounded">
               Hybrid Search Result
             </span>
           </div>
-          <p className="text-gray-900">{result.text}</p>
+          {nodeData ? (
+            <p className="text-gray-900">{nodeData.text}</p>
+          ) : (
+            <p className="text-gray-900">{result.text || 'Loading node details...'}</p>
+          )}
         </div>
       </div>
       <div className="mt-3 flex items-center space-x-4 text-sm">
@@ -201,14 +215,14 @@ function SearchResultCard({ result }: { result: HybridSearchResult }) {
           <span className="font-medium">Final Score:</span> {result.final_score.toFixed(4)}
         </div>
       </div>
-      {result.metadata && Object.keys(result.metadata).length > 0 && (
+      {nodeData?.metadata && Object.keys(nodeData.metadata).length > 0 && (
         <div className="mt-2 pt-2 border-t border-gray-100">
           <details className="text-xs">
             <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
               Metadata
             </summary>
             <pre className="mt-2 text-xs bg-gray-50 p-2 rounded overflow-auto">
-              {JSON.stringify(result.metadata, null, 2)}
+              {JSON.stringify(nodeData.metadata, null, 2)}
             </pre>
           </details>
         </div>
@@ -216,4 +230,3 @@ function SearchResultCard({ result }: { result: HybridSearchResult }) {
     </div>
   )
 }
-

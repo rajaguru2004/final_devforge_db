@@ -1,16 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Edit, Search } from 'lucide-react'
+import { Plus, Trash2, Edit, Search, ExternalLink } from 'lucide-react'
 import { nodeApi, type Node, type NodeCreate, type NodeUpdate } from '../services/api'
 
 export default function Nodes() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingNode, setEditingNode] = useState<Node | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const queryClient = useQueryClient()
-
-  // Note: You'd need to add a list endpoint to your API
-  // For now, this is a placeholder structure
 
   const createMutation = useMutation({
     mutationFn: (data: NodeCreate) => nodeApi.create(data).then(res => res.data),
@@ -45,10 +43,17 @@ export default function Nodes() {
   }
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this node?')) {
+    if (confirm('Are you sure you want to delete this node? This will also remove all connected edges.')) {
       deleteMutation.mutate(id)
     }
   }
+
+  // Fetch node details when selected
+  const { data: selectedNode } = useQuery({
+    queryKey: ['node', selectedNodeId],
+    queryFn: () => nodeApi.get(selectedNodeId!).then(res => res.data),
+    enabled: !!selectedNodeId,
+  })
 
   return (
     <div className="space-y-6">
@@ -72,20 +77,86 @@ export default function Nodes() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search nodes by text or metadata..."
+            placeholder="Search nodes by ID (enter node ID to view details)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && searchQuery.trim()) {
+                setSelectedNodeId(searchQuery.trim())
+              }
+            }}
             className="input pl-10"
           />
         </div>
       </div>
 
-      {/* Nodes List */}
-      <div className="card">
-        <p className="text-gray-500 text-center py-8">
-          Node list will appear here. Add a GET /nodes endpoint to your API to fetch all nodes.
-        </p>
-      </div>
+      {/* Selected Node Details */}
+      {selectedNode && (
+        <div className="card">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Node Details</h2>
+              <p className="text-sm text-gray-500 mt-1">ID: {selectedNode.id}</p>
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setEditingNode(selectedNode)}
+                className="btn btn-secondary flex items-center space-x-1"
+              >
+                <Edit className="h-4 w-4" />
+                <span>Edit</span>
+              </button>
+              <button
+                onClick={() => handleDelete(selectedNode.id)}
+                className="btn btn-danger flex items-center space-x-1"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete</span>
+              </button>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Text Content</label>
+              <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{selectedNode.text}</p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Metadata</label>
+              <pre className="text-sm bg-gray-50 p-3 rounded-lg overflow-auto">
+                {JSON.stringify(selectedNode.metadata, null, 2)}
+              </pre>
+            </div>
+
+            {selectedNode.edges && selectedNode.edges.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Connected Edges ({selectedNode.edges.length})</label>
+                <div className="space-y-2">
+                  {selectedNode.edges.map((edge, idx) => (
+                    <div key={idx} className="bg-gray-50 p-3 rounded-lg flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">
+                          → {edge.target.slice(0, 8)}...
+                        </span>
+                        <span className="ml-2 text-xs text-gray-500">({edge.type})</span>
+                        <span className="ml-2 text-xs text-gray-500">weight: {edge.weight}</span>
+                      </div>
+                      <a
+                        href={`/edges/${edge.edge_id}`}
+                        className="text-primary-600 hover:text-primary-700 text-sm flex items-center space-x-1"
+                      >
+                        <span>View Edge</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Create Modal */}
       {showCreateModal && (
@@ -117,18 +188,25 @@ interface NodeModalProps {
 }
 
 function NodeModal({ node, onClose, onSubmit, isLoading }: NodeModalProps) {
+  const [id, setId] = useState(node?.id || '')
   const [text, setText] = useState(node?.text || '')
   const [metadata, setMetadata] = useState(JSON.stringify(node?.metadata || {}, null, 2))
-  const [autoEmbed, setAutoEmbed] = useState(true)
+  const [regenEmbedding, setRegenEmbedding] = useState(true)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     try {
       const metadataObj = JSON.parse(metadata)
       if (node) {
-        onSubmit({ text, metadata: metadataObj, regenerate_embedding: autoEmbed })
+        // Update
+        onSubmit({ text, metadata: metadataObj, regen_embedding: regenEmbedding })
       } else {
-        onSubmit({ text, metadata: metadataObj, auto_embed: autoEmbed })
+        // Create - requires ID
+        if (!id.trim()) {
+          alert('Node ID is required')
+          return
+        }
+        onSubmit({ id: id.trim(), text, metadata: metadataObj, regen_embedding: regenEmbedding })
       }
     } catch (error) {
       alert('Invalid JSON in metadata field')
@@ -142,9 +220,25 @@ function NodeModal({ node, onClose, onSubmit, isLoading }: NodeModalProps) {
           {node ? 'Edit Node' : 'Create Node'}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!node && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Node ID <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={id}
+                onChange={(e) => setId(e.target.value)}
+                className="input"
+                required
+                placeholder="Enter unique node ID"
+              />
+              <p className="text-xs text-gray-500 mt-1">Must be a unique identifier</p>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Text Content
+              Text Content <span className="text-red-500">*</span>
             </label>
             <textarea
               value={text}
@@ -168,13 +262,13 @@ function NodeModal({ node, onClose, onSubmit, isLoading }: NodeModalProps) {
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
-              id="autoEmbed"
-              checked={autoEmbed}
-              onChange={(e) => setAutoEmbed(e.target.checked)}
+              id="regenEmbedding"
+              checked={regenEmbedding}
+              onChange={(e) => setRegenEmbedding(e.target.checked)}
               className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
             />
-            <label htmlFor="autoEmbed" className="text-sm text-gray-700">
-              {node ? 'Regenerate embedding' : 'Auto-generate embedding'}
+            <label htmlFor="regenEmbedding" className="text-sm text-gray-700">
+              {node ? 'Regenerate embedding' : 'Generate embedding automatically'}
             </label>
           </div>
           <div className="flex justify-end space-x-3 pt-4">
@@ -195,4 +289,3 @@ function NodeModal({ node, onClose, onSubmit, isLoading }: NodeModalProps) {
     </div>
   )
 }
-
