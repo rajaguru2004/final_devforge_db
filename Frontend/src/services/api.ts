@@ -225,4 +225,19 @@ export const graphApi = {
   get: () => api.get<GraphData>('/graph'),
 }
 
+// Stats API
+export interface StatsData {
+  nodes: number
+  edges: number
+  vector_documents: number
+  graph_stats: {
+    nodes: number
+    edges: number
+  }
+}
+
+export const statsApi = {
+  get: () => api.get<StatsData>('/stats'),
+}
+
 export default api

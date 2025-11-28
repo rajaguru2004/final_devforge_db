@@ -15,6 +15,7 @@ export default function Edges() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['edges'] })
       queryClient.invalidateQueries({ queryKey: ['graph-data'] }) // Refresh graph
+      queryClient.invalidateQueries({ queryKey: ['stats'] }) // Refresh dashboard stats
       setShowCreateModal(false)
     },
   })
@@ -33,6 +34,7 @@ export default function Edges() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['edges'] })
       queryClient.invalidateQueries({ queryKey: ['graph-data'] }) // Refresh graph
+      queryClient.invalidateQueries({ queryKey: ['stats'] }) // Refresh dashboard stats
       setSelectedEdgeId(null)
     },
   })

@@ -45,3 +45,4 @@ def get_graph_data(service: HybridRetrievalService = Depends(get_service)):
         }
     }
 
+

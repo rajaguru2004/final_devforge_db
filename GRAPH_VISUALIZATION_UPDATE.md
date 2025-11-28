@@ -178,3 +178,4 @@
 - Node labels show truncated text (first 50 chars)
 - Full node text available in details panel
 
+
