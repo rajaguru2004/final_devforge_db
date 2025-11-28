@@ -231,6 +231,24 @@ Below are the API endpoints tested in `devforge_test_case.py` with their corresp
 
 Example: `/nodes/doc1`
 
+**Response:**
+```json
+{
+    "id": "doc1",
+    "text": "Redis caching strategies",
+    "metadata": { "type": "article", "tags": ["cache", "redis"] },
+    "embedding": [-0.012, 0.045, ...],
+    "edges": [
+        {
+            "edge_id": "edge_123",
+            "target": "doc4",
+            "type": "related_to",
+            "weight": 0.8
+        }
+    ]
+}
+```
+
 ## 3. Update Node
 **PUT** `/nodes/{id}`
 
@@ -264,6 +282,17 @@ Example: `/nodes/doc7`
 
 Example: `/edges/{edge_id}`
 
+**Response:**
+```json
+{
+    "edge_id": "edge_123",
+    "source": "doc1",
+    "target": "doc4",
+    "type": "related_to",
+    "weight": 0.8
+}
+```
+
 ## 7. Update Edge
 **PUT** `/edges/{id}`
 
@@ -293,6 +322,28 @@ Example: `/edges/{edge_id}`
 **GET** `/search/graph`
 
 Example: `/search/graph?start_id=doc6&depth=2`
+
+**Response:**
+```json
+{
+    "start_id": "doc6",
+    "depth": 2,
+    "nodes": [
+        {
+            "id": "doc2",
+            "hop": 1,
+            "edge": "mentions",
+            "weight": 0.9
+        },
+        {
+            "id": "doc4",
+            "hop": 2,
+            "edge_path": ["references", "related_to"],
+            "weights": [0.6, 0.8]
+        }
+    ]
+}
+```
 
 ## 11. Hybrid Search
 **POST** `/search/hybrid`
