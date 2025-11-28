@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-from app.models import NodeCreate, NodeResponse, NodeUpdate, NodeUpdateResponse, NodeDeleteResponse
+from app.models import NodeCreate, NodeResponse, NodeCreateResponse, NodeUpdate, NodeUpdateResponse, NodeDeleteResponse
 from app.service import HybridRetrievalService
 from app.dependencies import get_service
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
-@router.post("", response_model=NodeResponse)
+@router.post("", response_model=NodeCreateResponse)
 def create_node(node: NodeCreate, service: HybridRetrievalService = Depends(get_service)):
     return service.create_node(node)
 
