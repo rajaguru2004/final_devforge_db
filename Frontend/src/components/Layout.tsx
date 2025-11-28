@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Database, Search, FileText, Network, Plus, Home } from 'lucide-react'
+import { Database, Search, FileText, Network, Plus, Home, TestTube } from 'lucide-react'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -15,6 +15,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/search', label: 'Search', icon: Search },
     { path: '/pdf', label: 'PDF Upload', icon: FileText },
     { path: '/graph', label: 'Graph View', icon: Network },
+    { path: '/tests', label: 'Test Runner', icon: TestTube },
   ]
 
   return (

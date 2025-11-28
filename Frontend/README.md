@@ -120,6 +120,14 @@ The Vite dev server is configured to proxy `/api` requests to the backend. This 
 4. Click nodes to view details
 5. Zoom and pan to explore
 
+### Running Test Cases
+
+1. Navigate to **Test Runner** page
+2. Click **Run All Tests** to execute all test cases
+3. Or click **Run** on individual test cases
+4. View test results with detailed responses
+5. Tests match the test cases from `devforge_test_case.py`
+
 ## 🛠️ Tech Stack
 
 - **React 18** - UI framework
@@ -137,11 +145,41 @@ The Vite dev server is configured to proxy `/api` requests to the backend. This 
 The frontend uses the FastAPI backend endpoints:
 
 - `GET/POST/PUT/DELETE /nodes` - Node CRUD
-- `GET/POST/DELETE /edges` - Edge CRUD
+- `GET/POST/PUT/DELETE /edges` - Edge CRUD
 - `POST /search/vector` - Vector search
 - `GET /search/graph` - Graph traversal
 - `POST /search/hybrid` - Hybrid search
 - `POST /pdf/search` - PDF upload and search
+
+## 🧪 Testing
+
+The UI includes a comprehensive test runner that executes all test cases from `devforge_test_case.py`:
+
+1. Navigate to **Test Runner** page (`/tests`)
+2. Click **Run All Tests** to execute all 12 test cases sequentially
+3. Or run individual tests by clicking the **Run** button on each test
+4. View detailed results including:
+   - Test status (passed/failed)
+   - Response data
+   - Error messages (if any)
+   - Request payloads
+
+### Test Cases Included
+
+1. Create Node (doc1)
+2. Get Node (doc1)
+3. Update Node (doc1)
+4. Create Node (doc4) - for edge testing
+5. Create Edge (doc1 → doc4)
+6. Get Edge
+7. Update Edge (weight)
+8. Vector Search with metadata filter
+9. Graph Traversal from doc1
+10. Hybrid Search
+11. Delete Edge
+12. Delete Node (doc7)
+
+All test cases use the exact payloads from `devforge_test_case.py`.
 
 See `src/services/api.ts` for the complete API client implementation.
 
